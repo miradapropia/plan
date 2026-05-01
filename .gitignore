@@ -1,0 +1,30 @@
+# Netlify
+.netlify/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Build artifacts (not used here but in case of future)
+dist/
+build/
+
+# Local
+*.log

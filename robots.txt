@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /.netlify/
+
+# Block specific bots that scrape content
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+Sitemap: https://plan.miradapropia.org/sitemap.xml
