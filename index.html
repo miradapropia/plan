@@ -41,6 +41,7 @@
 <meta name="theme-color" content="#0f0f0e" media="(prefers-color-scheme: dark)"/>
 <meta name="application-name" content="plan"/>
 <meta name="apple-mobile-web-app-title" content="plan"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="format-detection" content="telephone=no"/>
@@ -1228,7 +1229,26 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
           placeholder="anotaciones, recordatorios, lo que tienes que llevar..."></textarea>
       </div>
 
-      <!-- Done toggle + links -->
+      <!-- Links section -->
+      <div class="event-section">
+        <div class="event-section-lbl">
+          <span>enlaces</span>
+          <button onclick="toggleSchLinkAdd()">+ añadir</button>
+        </div>
+        <div class="link-list" id="sch-links-list"></div>
+        <div class="link-add-row" id="sch-link-add" style="display:none">
+          <select class="link-type-select" id="sch-link-type">
+            <option value="url">url</option>
+            <option value="folder">carpeta</option>
+            <option value="app">app link</option>
+          </select>
+          <input class="link-add-input" id="sch-link-input"
+            placeholder="https://... o /Users/..." onkeydown="if(event.key==='Enter')addSchLink()"/>
+          <button class="link-add-btn" onclick="addSchLink()">↵</button>
+        </div>
+      </div>
+
+      <!-- Done toggle -->
       <div class="event-section">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:11.5px;color:var(--g800)">
           <input type="checkbox" id="sch-done" style="cursor:pointer;accent-color:var(--black);width:14px;height:14px"/>
@@ -3442,11 +3462,13 @@ function deleteCurrentEvent(){
 // SCHEDULE BLOCK MODAL — edit weekly time slots
 // ═══════════════════════════════════════════
 let editingScheduleIdx = null;
+let pendingSchLinks = [];
 
 function editScheduleBlock(idx){
   if(idx < 0 || !STATE.schedule[idx]) return;
   editingScheduleIdx = idx;
   const b = STATE.schedule[idx];
+  pendingSchLinks = [...(b.links || [])];
 
   // Populate hour selects (0-23)
   const startSel = document.getElementById('sch-start');
@@ -3468,8 +3490,71 @@ function editScheduleBlock(idx){
   document.getElementById('sch-done').checked = !!b.done;
   populateSubjectSelect('sch-subj', b.subj);
 
+  // Reset and render links
+  document.getElementById('sch-link-add').style.display = 'none';
+  document.getElementById('sch-link-input').value = '';
+  renderSchLinks();
+
   document.getElementById('modal-schedule').classList.add('open');
   setTimeout(() => document.getElementById('sch-title').focus(), 100);
+}
+
+// ── Schedule block link helpers ──────────────────
+function toggleSchLinkAdd(){
+  const el = document.getElementById('sch-link-add');
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'flex';
+  if(!isOpen){
+    document.getElementById('sch-link-input').value = '';
+    setTimeout(() => document.getElementById('sch-link-input').focus(), 50);
+  }
+}
+
+function addSchLink(){
+  const url = document.getElementById('sch-link-input').value.trim();
+  const type = document.getElementById('sch-link-type').value;
+  if(!url) return;
+  pendingSchLinks.push({type, url});
+  document.getElementById('sch-link-input').value = '';
+  document.getElementById('sch-link-add').style.display = 'none';
+  renderSchLinks();
+}
+
+function removeSchLink(idx){
+  pendingSchLinks.splice(idx, 1);
+  renderSchLinks();
+}
+
+function clickSchLink(idx){
+  const l = pendingSchLinks[idx];
+  if(l.type === 'folder'){
+    navigator.clipboard.writeText(l.url).then(() => {
+      showToast('ruta copiada · pégala en finder/explorer');
+    }).catch(() => {
+      showToast('no se pudo copiar');
+    });
+  } else {
+    window.open(l.url, '_blank', 'noopener');
+  }
+}
+
+function renderSchLinks(){
+  const list = document.getElementById('sch-links-list');
+  if(pendingSchLinks.length === 0){
+    list.innerHTML = `<div style="font-size:10px;color:var(--g400);padding:6px 0">sin enlaces</div>`;
+    return;
+  }
+  list.innerHTML = pendingSchLinks.map((l, i) => {
+    const info = getLinkInfo(l);
+    return `<div class="link-item" onclick="clickSchLink(${i})" title="${l.url.replace(/"/g,'&quot;')}">
+      <span class="link-icon">${info.icon}</span>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <div class="link-text">${info.label}</div>
+        <div class="link-host">${info.host}</div>
+      </div>
+      <button class="link-remove" onclick="event.stopPropagation();removeSchLink(${i})">×</button>
+    </div>`;
+  }).join('');
 }
 
 function saveSchedule(){
@@ -3487,7 +3572,8 @@ function saveSchedule(){
   if(endH <= startH){ showToast('la hora final debe ser posterior'); return; }
 
   STATE.schedule[editingScheduleIdx] = {
-    title, day, startH, endH, type, subj, notes, done
+    title, day, startH, endH, type, subj, notes, done,
+    links: [...pendingSchLinks]
   };
   saveState();
   closeModalForce('modal-schedule');
@@ -3708,9 +3794,60 @@ async function sendMsg(){
         messages: apiMessages
       })
     });
-    const data = await res.json();
-    const reply = data.content?.[0]?.text || data.error || 'no he podido responder.';
+
     typing.remove();
+
+    // Get response as text first so we can debug 404s and HTML error pages
+    const rawText = await res.text();
+
+    // Detect specific failure modes
+    if(res.status === 404){
+      // Function not deployed or running locally without netlify dev
+      const isLocal = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      const msg = isLocal
+        ? 'la función ia no está disponible en local. necesitas desplegar en netlify (o usar `netlify dev`) para que funcione.'
+        : 'la función serverless no se encuentra (404). asegúrate de que la carpeta `netlify/functions/` se subió al repositorio.';
+      addBubble('assistant', msg);
+      STATE.iaMessages.pop(); // rollback the user message we added
+      saveState();
+      throw new Error('Function 404');
+    }
+
+    if(res.status === 500 || res.status === 502){
+      const msg = 'error del servidor. lo más probable es que falte la variable `ANTHROPIC_API_KEY` en netlify, o que la clave esté mal. revísalo en site settings → environment variables.';
+      addBubble('assistant', msg);
+      STATE.iaMessages.pop();
+      saveState();
+      throw new Error(`Server ${res.status}`);
+    }
+
+    // Try to parse JSON
+    let data;
+    try{
+      data = JSON.parse(rawText);
+    }catch(e){
+      addBubble('assistant', `respuesta inválida del servidor (${res.status}). respuesta: ${rawText.substring(0,150)}...`);
+      STATE.iaMessages.pop();
+      saveState();
+      throw new Error('Invalid JSON');
+    }
+
+    // API-level error from anthropic
+    if(data.type === 'error' || data.error){
+      const apiMsg = data.error?.message || data.message || JSON.stringify(data.error);
+      addBubble('assistant', `error de la api: ${apiMsg}`);
+      STATE.iaMessages.pop();
+      saveState();
+      throw new Error('API error');
+    }
+
+    const reply = data.content?.[0]?.text;
+    if(!reply){
+      addBubble('assistant', 'la api no devolvió texto. inténtalo de nuevo.');
+      STATE.iaMessages.pop();
+      saveState();
+      throw new Error('No content');
+    }
 
     // Replace last user msg (with full base64) with text-only for storage
     STATE.iaMessages[STATE.iaMessages.length-1] = {role:'user', content: msgText, displayText: bubbleTxt};
@@ -3728,9 +3865,13 @@ async function sendMsg(){
 
     saveState();
   }catch(err){
-    typing.remove();
-    addBubble('assistant', 'error de conexión.');
-    console.error(err);
+    // typing already removed above; if not, remove now
+    if(typing.parentNode) typing.remove();
+    if(!err.message.match(/Function 404|Server |Invalid JSON|API error|No content/)){
+      // Network-level error (fetch failed)
+      addBubble('assistant', 'error de red. comprueba tu conexión a internet.');
+    }
+    console.error('IA error:', err);
   }
 
   document.getElementById('ia-send').disabled = false;

@@ -145,6 +145,40 @@ O desde la app: botón **datos → borrar todo**.
 
 ---
 
+## Solución de problemas
+
+### Error 404 al hablar con la IA
+
+La función serverless no se encuentra. Puede deberse a:
+
+- **Estás abriendo el `index.html` directamente desde el disco** — la IA solo funciona cuando se sirve a través de Netlify (o `netlify dev` en local). Funcionalidades como el calendario, notas, temporizador, exportación, etc. funcionan offline.
+- **La carpeta `netlify/functions/` no se subió al repositorio** — verifica que esté en GitHub.
+- **El despliegue no detectó la función** — en el dashboard de Netlify, ve a *Functions* y comprueba que `claude` aparece en la lista.
+
+### Error 500 / "ANTHROPIC_API_KEY no está configurada"
+
+- Ve a *Site settings → Environment variables* y añade la variable `ANTHROPIC_API_KEY` con tu clave (`sk-ant-...`)
+- Después: *Deploys → Trigger deploy → Clear cache and deploy site* para que tome el cambio
+- Si la clave ya está, comprueba que no tenga espacios ni saltos de línea
+
+### Error de la API (rate limit, modelo no encontrado, etc)
+
+- **Rate limit**: espera unos segundos y reintenta
+- **Modelo no encontrado**: el identificador del modelo en `index.html` (`claude-sonnet-4-6`) puede haber cambiado. Consulta los modelos disponibles en [docs.claude.com](https://docs.claude.com/en/docs/about-claude/models/overview)
+- **Insufficient credits**: añade saldo en [console.anthropic.com](https://console.anthropic.com)
+
+### "A listener indicated an asynchronous response..."
+
+Este error viene de **una extensión del navegador** (típicamente un bloqueador de anuncios o gestor de contraseñas), no del código de la app. Puedes ignorarlo. Para silenciarlo, prueba el sitio en una ventana de incógnito.
+
+### El plan se borra al recargar
+
+- Comprueba que no estés en modo incógnito (no persiste localStorage)
+- Algunos navegadores limpian localStorage al cerrar — revisa los ajustes de privacidad
+- Haz copias de seguridad periódicas con *datos → exportar*
+
+---
+
 ## Tecnología
 
 - **HTML/CSS/JS vanilla** — sin frameworks, sin build, sin transpilación
