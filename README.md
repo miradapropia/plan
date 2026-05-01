@@ -120,10 +120,10 @@ plan-miradapropia/
 
 ### Cambiar el modelo de IA
 
-En `index.html`, busca `claude-sonnet-4-20250514` y reemplaza por el modelo deseado:
+En `index.html`, busca `claude-sonnet-4-6` y reemplaza por el modelo deseado:
 
-- `claude-sonnet-4-20250514` — actual (recomendado: equilibrio coste/calidad)
-- `claude-opus-4-1-20250805` — más capaz, más caro
+- `claude-sonnet-4-6` — actual (recomendado: equilibrio coste/calidad)
+- `claude-opus-4-7` — más capaz, más caro
 - `claude-haiku-4-5-20251001` — más rápido y barato
 
 ### Cambiar el system prompt de la IA
