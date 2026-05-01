@@ -3348,10 +3348,16 @@ function editEvent(idx){
 
 function populateSubjectSelect(id, selected){
   const sel = document.getElementById(id);
-  sel.innerHTML = STATE.subjects.map(s => `<option value="${s.id}" ${s.id===selected?'selected':''}>${s.name}</option>`).join('');
-  if(STATE.subjects.length === 0){
-    sel.innerHTML = `<option value="otra">otra</option>`;
+  let html = STATE.subjects.map(s => `<option value="${s.id}" ${s.id===selected?'selected':''}>${s.name}</option>`).join('');
+  // If the requested 'selected' value is not in current subjects, add it as a preserved option
+  // so it doesn't get accidentally clobbered by the dropdown defaulting to the first item.
+  if(selected && !STATE.subjects.some(s => s.id === selected)){
+    html = `<option value="${selected}" selected>${selected} (sin asignar)</option>` + html;
   }
+  if(!html){
+    html = `<option value="otra">otra</option>`;
+  }
+  sel.innerHTML = html;
 }
 
 // ── LINKS ───────────────────────────────────────
@@ -3463,10 +3469,18 @@ function saveEvent(){
   } else {
     STATE.events.push(data);
   }
+
+  // If a subject filter is active and would hide this event, clear it
+  let toastMsg = editingEventIdx !== null ? 'evento actualizado' : 'evento añadido';
+  if(selectedSubjId && selectedSubjId !== subj){
+    selectedSubjId = null;
+    toastMsg += ' · filtro de asignatura quitado';
+  }
+
   saveState();
   closeModalForce('modal-event');
   renderAll();
-  showToast(editingEventIdx !== null ? 'evento actualizado' : 'evento añadido');
+  showToast(toastMsg);
 }
 
 function deleteCurrentEvent(){
@@ -3595,10 +3609,19 @@ function saveSchedule(){
     title, day, startH, endH, type, subj, notes, done,
     links: [...pendingSchLinks]
   };
+
+  // If a subject filter is active and would hide the saved block, clear the filter
+  // so the user doesn't think the block disappeared.
+  if(selectedSubjId && selectedSubjId !== subj){
+    selectedSubjId = null;
+    showToast('bloque actualizado · filtro de asignatura quitado');
+  } else {
+    showToast('bloque actualizado');
+  }
+
   saveState();
   closeModalForce('modal-schedule');
   renderAll();
-  showToast('bloque actualizado');
 }
 
 function deleteCurrentSchedule(){
@@ -4007,7 +4030,20 @@ function importAIPlan(txt){
     }
 
     if(data.schedule && Array.isArray(data.schedule)){
-      STATE.schedule = data.schedule.map(s => ({...s, done: false}));
+      // Preserve manual notes, links, and done state when IA replaces schedule
+      const oldSchedule = STATE.schedule || [];
+      STATE.schedule = data.schedule.map(s => {
+        // Try to find a matching old block by day + start hour + subject
+        const match = oldSchedule.find(o =>
+          o.day === s.day && o.startH === s.startH && o.subj === s.subj
+        );
+        return {
+          ...s,
+          done: match?.done || false,
+          notes: match?.notes || s.notes || '',
+          links: match?.links || s.links || []
+        };
+      });
       logChange('update', `horario semanal actualizado`);
     }
 
