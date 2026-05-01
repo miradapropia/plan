@@ -2048,10 +2048,12 @@ function openSubjectDetail(id){
 
   // Stats
   const allEvs = STATE.events.filter(e => e.subj === id);
+  const subjSchedules = STATE.schedule.filter(s => s.subj === id);
   const upcoming = allEvs.filter(e => !e.done && new Date(e.date) >= new Date(new Date().setHours(0,0,0,0))).length;
   const totalMinutes = STATE.sessionLogs.filter(l => l.subjId === id).reduce((acc, l) => acc + l.minutes, 0);
   const totalHours = (totalMinutes / 60).toFixed(1);
-  const allLinks = allEvs.flatMap(e => e.links || []).length;
+  const allLinks = allEvs.flatMap(e => e.links || []).length
+                 + subjSchedules.flatMap(s => s.links || []).length;
 
   document.getElementById('subj-detail-stats').innerHTML = `
     <div class="subj-detail-stat"><strong>${sub.progress || 0}%</strong>completado</div>
@@ -2098,10 +2100,18 @@ function openSubjectDetail(id){
   }
   body += `</div>`;
 
-  // 2. LINKS — aggregated from all events
+  // 2. LINKS — aggregated from all events AND schedule blocks
   const allLinkEntries = [];
   allEvs.forEach(ev => {
-    (ev.links || []).forEach(l => allLinkEntries.push({...l, eventTitle: ev.title, eventDate: ev.date}));
+    (ev.links || []).forEach(l => allLinkEntries.push({...l, contextTitle: ev.title, contextType: 'evento'}));
+  });
+  const DAY_NAMES = ['lun','mar','mié','jue','vie','sáb','dom'];
+  subjSchedules.forEach(b => {
+    (b.links || []).forEach(l => allLinkEntries.push({
+      ...l,
+      contextTitle: `${b.title} · ${DAY_NAMES[b.day] || ''} ${b.startH}–${b.endH}h`,
+      contextType: 'horario'
+    }));
   });
   body += `<div class="subj-detail-section">
     <div class="subj-detail-section-lbl">enlaces guardados</div>`;
@@ -2112,7 +2122,7 @@ function openSubjectDetail(id){
       body += `<div class="subj-detail-link" onclick="${l.type==='folder'?`navigator.clipboard.writeText('${l.url.replace(/'/g,"\\\\'")}');showToast('ruta copiada')`:`window.open('${l.url}', '_blank')`}" title="${l.url.replace(/"/g,'&quot;')}">
         <span class="subj-detail-link-icon">${info.icon}</span>
         <span class="subj-detail-link-text">${info.label}</span>
-        <span class="subj-detail-link-context">${l.eventTitle}</span>
+        <span class="subj-detail-link-context">${l.contextTitle}</span>
       </div>`;
     });
     body += `</div>`;
@@ -2128,6 +2138,16 @@ function openSubjectDetail(id){
       notesEntries.push({type:'event', text:ev.notes, label:ev.title, date:ev.date});
     }
   });
+  subjSchedules.forEach(b => {
+    if(b.notes && b.notes.trim()){
+      notesEntries.push({
+        type:'schedule',
+        text:b.notes,
+        label:`${b.title} · ${DAY_NAMES[b.day] || ''} ${b.startH}–${b.endH}h`,
+        date: new Date().toISOString() // schedule blocks are recurring, use today as anchor
+      });
+    }
+  });
   STATE.sessionLogs.filter(l => l.subjId === id && l.note && l.note.trim()).forEach(l => {
     notesEntries.push({type:'session', text:l.note, label:`sesión de ${l.minutes}min`, date:l.date});
   });
@@ -2141,7 +2161,7 @@ function openSubjectDetail(id){
     notesEntries.forEach(n => {
       const d = new Date(n.date);
       const dateStr = `${d.getDate()}/${d.getMonth()+1}`;
-      const icon = n.type === 'session' ? '⏱' : '📌';
+      const icon = n.type === 'session' ? '⏱' : n.type === 'schedule' ? '📅' : '📌';
       body += `<div class="subj-detail-note">
         <div class="subj-detail-note-meta">${icon} ${n.label} · ${dateStr}</div>
         <div class="subj-detail-note-text">${n.text.replace(/\n/g,'<br>')}</div>
@@ -3855,7 +3875,19 @@ async function sendMsg(){
 
     // Try to import; if there's JSON, it's a direct change
     const imported = importAIPlan(reply);
-    const display = reply.replace(/```json[\s\S]*?```/g, '[plan actualizado ✦]').trim();
+    // Strip JSON code fences in any of these forms:
+    //   ```json ... ``` (with newlines)
+    //   ```json... ```` (no newlines)
+    //   ``` ... ``` (no language)
+    //   {...} (raw object containing 'subjects'/'events'/'schedule'/'weekly_plan' keys)
+    let display = reply
+      .replace(/```(?:json)?\s*[\s\S]*?\s*```/g, '[plan actualizado ✦]')
+      .replace(/(\{[\s\S]*?"(?:subjects|events|schedule|weekly_plan)"[\s\S]*?\})\s*$/g, '[plan actualizado ✦]')
+      .trim();
+    // Fallback: if everything got stripped or only the marker remains, replace with a default
+    if(!display || display === '[plan actualizado ✦]'){
+      display = imported ? '✦ plan actualizado' : reply.trim();
+    }
     addBubble('assistant', display);
 
     if(imported){
@@ -3902,10 +3934,19 @@ function addTyping(){
 }
 
 function importAIPlan(txt){
-  const m = txt.match(/```json\s*([\s\S]*?)\s*```/);
-  if(!m) return false;
+  // Try several formats the model might emit
+  let jsonStr = null;
+  // 1) ```json ... ``` (with or without newlines)
+  let m = txt.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+  if(m) jsonStr = m[1];
+  // 2) Raw JSON object containing one of our known keys
+  if(!jsonStr){
+    m = txt.match(/(\{[\s\S]*?"(?:subjects|events|schedule|weekly_plan)"[\s\S]*\})/);
+    if(m) jsonStr = m[1];
+  }
+  if(!jsonStr) return false;
   try{
-    const data = JSON.parse(m[1]);
+    const data = JSON.parse(jsonStr);
 
     if(data.subjects && Array.isArray(data.subjects)){
       data.subjects.forEach(ds => {
