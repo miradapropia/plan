@@ -910,10 +910,10 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
 /* video background — hidden by default, visible only when body.ambient-on */
 .ambient-bg{position:fixed;inset:0;z-index:0;display:none;overflow:hidden;background:#0a0a0a}
 .ambient-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
-  filter:blur(6px) brightness(.55) saturate(.9);transform:scale(1.05);
+  filter:brightness(.75) saturate(1);
   transition:filter .6s cubic-bezier(.22,1,.36,1)}
 .ambient-scrim{position:absolute;inset:0;background:radial-gradient(ellipse at center,
-  rgba(10,10,10,0) 30%,rgba(10,10,10,.4) 100%);pointer-events:none}
+  rgba(10,10,10,0) 40%,rgba(10,10,10,.55) 100%);pointer-events:none}
 .ambient-bg.no-video{background:linear-gradient(135deg,#0f0f0e 0%,#1a1a18 50%,#0a0a0a 100%)}
 .ambient-bg.no-video .ambient-video{display:none}
 
@@ -924,12 +924,12 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
 @keyframes awFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 .aw-tl{top:18px;left:22px;animation-delay:.1s}
-.aw-tr{top:18px;right:22px;animation-delay:.15s}
-.aw-bl{bottom:88px;left:22px;animation-delay:.25s}
-.aw-br{bottom:88px;right:22px;animation-delay:.3s;text-align:right}
-.aw-lm{top:50%;left:22px;transform:translateY(-50%);animation-delay:.35s}
-.aw-rm{top:50%;right:22px;transform:translateY(-50%);animation-delay:.4s;
-  display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.aw-lm{top:50%;left:22px;transform:translateY(-50%);animation-delay:.3s;
+  display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.aw-rm{top:64px;right:22px;bottom:80px;animation-delay:.35s;
+  display:flex;flex-direction:column;gap:14px;align-items:stretch;
+  overflow-y:auto;scrollbar-width:none}
+.aw-rm::-webkit-scrollbar{display:none}
 
 /* ambient widget styles — text on dark video */
 .aw-exit{width:36px;height:36px;border:1px solid rgba(255,255,255,.18);
@@ -939,25 +939,39 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
   transition:all .2s}
 .aw-exit:hover{background:rgba(0,0,0,.6);border-color:rgba(255,255,255,.4);transform:scale(1.05)}
 
-.aw-clock-time{font-size:64px;font-weight:200;letter-spacing:-3px;line-height:1;
-  color:rgba(255,255,255,.92);font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,.5)}
-.aw-clock-date{font-size:11px;letter-spacing:2px;color:rgba(255,255,255,.55);margin-top:6px;text-transform:lowercase}
-
-.aw-cd-label{font-size:9px;letter-spacing:2.5px;color:rgba(255,255,255,.5);margin-bottom:4px}
-.aw-cd-big{font-size:48px;font-weight:200;letter-spacing:-2px;line-height:1;
-  color:rgba(255,255,255,.95);font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,.5)}
-.aw-cd-big.urgent{color:#ff8585}
-.aw-cd-title{font-size:12px;color:rgba(255,255,255,.7);margin-top:6px;line-height:1.3;max-width:240px;
-  margin-left:auto}
-.aw-cd-sub{font-size:9px;color:rgba(255,255,255,.45);margin-top:3px;font-variant-numeric:tabular-nums;letter-spacing:.5px}
-
-/* timer + sessions floating widget */
-.aw-lm{padding:14px 16px;background:rgba(0,0,0,.35);
+/* ── LEFT MID: nav pills (glass card) ── */
+.aw-lm{padding:14px;background:rgba(0,0,0,.4);
   backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);
   border:1px solid rgba(255,255,255,.1);border-radius:12px;width:160px}
+
+/* ── RIGHT MID: vertical stack of all status/control widgets ── */
+.aw-rm{width:230px;padding:18px;background:rgba(0,0,0,.4);
+  backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.1);border-radius:12px}
+
+.aw-r-block{padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.07)}
+.aw-r-block:last-child{border-bottom:none;padding-bottom:0}
+
+/* clock block in right widget */
+.aw-r-clock{text-align:center}
+.aw-clock-time{font-size:48px;font-weight:200;letter-spacing:-2px;line-height:1;
+  color:rgba(255,255,255,.95);font-variant-numeric:tabular-nums}
+.aw-clock-date{font-size:10px;letter-spacing:1.8px;color:rgba(255,255,255,.55);margin-top:6px;text-transform:lowercase}
+
+/* countdown block in right widget */
+.aw-r-countdown{text-align:center}
+.aw-cd-big{font-size:32px;font-weight:200;letter-spacing:-1px;line-height:1.1;
+  color:rgba(255,255,255,.95);font-variant-numeric:tabular-nums;margin-top:4px}
+.aw-cd-big.urgent{color:#ff8585}
+.aw-cd-title{font-size:11px;color:rgba(255,255,255,.7);margin-top:6px;line-height:1.3}
+.aw-cd-sub{font-size:9px;color:rgba(255,255,255,.45);margin-top:3px;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+
+/* timer block in right widget */
+.aw-r-timer{text-align:center}
 .aw-section-lbl{font-size:8px;letter-spacing:2px;color:rgba(255,255,255,.45);margin-bottom:9px;text-align:center}
-.aw-timer-display{font-size:32px;font-weight:200;letter-spacing:-1.5px;line-height:1;text-align:center;
-  color:rgba(255,255,255,.95);font-variant-numeric:tabular-nums;margin-bottom:9px}
+.aw-lm .aw-section-lbl{text-align:left}
+.aw-timer-display{font-size:30px;font-weight:200;letter-spacing:-1.5px;line-height:1;text-align:center;
+  color:rgba(255,255,255,.95);font-variant-numeric:tabular-nums;margin-bottom:9px;margin-top:4px}
 .aw-timer-ctrl{display:flex;justify-content:center;gap:5px;margin-bottom:7px}
 .aw-timer-btn{padding:5px 11px;border:1px solid rgba(255,255,255,.18);background:transparent;
   color:rgba(255,255,255,.8);border-radius:18px;font-size:8px;letter-spacing:1px;cursor:pointer;
@@ -971,11 +985,24 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
 .aw-session-btn:hover{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.95)}
 .aw-session-btn.running{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3)}
 
+/* MUSIC slot — restyled when in ambient mode */
+.aw-r-music:empty{display:none}
+body.ambient-on .aw-r-music .music-section{padding:0;background:transparent;border:none}
+body.ambient-on .aw-r-music .music-section-header{padding:0 0 8px 0;border:none}
+body.ambient-on .aw-r-music .music-section-lbl{font-size:8px;letter-spacing:2px;color:rgba(255,255,255,.45);font-weight:400}
+body.ambient-on .aw-r-music .music-toggle{color:rgba(255,255,255,.6);background:none;border:none;cursor:pointer}
+body.ambient-on .aw-r-music .music-input-row{padding:0 0 8px 0}
+body.ambient-on .aw-r-music .music-input{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.92);font-size:10px;padding:6px 10px;border-radius:6px}
+body.ambient-on .aw-r-music .music-input::placeholder{color:rgba(255,255,255,.4)}
+body.ambient-on .aw-r-music .music-add{background:rgba(255,255,255,.92);color:#0a0a0a;border:none;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:13px;margin-left:5px}
+body.ambient-on .aw-r-music .music-embed-wrap{margin:0;border-radius:8px;overflow:hidden}
+body.ambient-on .aw-r-music .music-empty{font-size:9px;color:rgba(255,255,255,.4);padding:16px 8px;text-align:center;line-height:1.5}
+body.ambient-on .aw-r-music .music-actions{padding:6px 0 0 0;text-align:right}
+body.ambient-on .aw-r-music .music-clear{font-size:9px;color:rgba(255,255,255,.5);background:none;border:1px solid rgba(255,255,255,.15);padding:3px 8px;border-radius:10px;cursor:pointer;font-family:inherit;letter-spacing:.5px}
+body.ambient-on .aw-r-music .music-clear:hover{color:rgba(255,255,255,.95);border-color:rgba(255,255,255,.4)}
+body.ambient-on .aw-r-music iframe{border:none;width:100%;border-radius:8px}
+
 /* nav pills floating widget */
-.aw-rm{padding:14px 14px;background:rgba(0,0,0,.35);
-  backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);
-  border:1px solid rgba(255,255,255,.1);border-radius:12px;width:140px;align-items:stretch}
-.aw-rm .aw-section-lbl{text-align:left;margin-bottom:9px}
 .aw-nav-pill{padding:8px 12px;border:1px solid rgba(255,255,255,.15);background:transparent;
   color:rgba(255,255,255,.78);border-radius:8px;font-size:11px;letter-spacing:.5px;
   cursor:pointer;font-family:inherit;text-align:left;transition:all .15s}
@@ -1032,7 +1059,7 @@ body.ambient-on .ia-changelog-icon{color:rgba(255,255,255,.85)}
 body.ambient-on .ia-changelog-time{color:rgba(255,255,255,.4)}
 
 /* ── SPOTLIGHT — when a view is opened over the ambient bg ── */
-body.ambient-on.spotlight-on .ambient-video{filter:blur(20px) brightness(.35) saturate(.7)}
+body.ambient-on.spotlight-on .ambient-video{filter:brightness(.45) saturate(.7)}
 
 /* When .main is inside the spotlight, hide its native nav tabs */
 .spotlight-body .main nav.tabs{display:none}
@@ -1079,7 +1106,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
     backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
   html.dark body.ambient-on .sidebar,html.dark body.ambient-on .focus-panel,html.dark body.ambient-on .main{
     background:rgba(15,15,14,.88)}
-  body.ambient-on .ambient-video{filter:blur(20px) brightness(.55)}
+  body.ambient-on .ambient-video{filter:brightness(.65)}
 }
 
 /* respect reduced motion */
@@ -1088,7 +1115,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
   .ambient-bg{background:linear-gradient(135deg,#1a1a18 0%,#0f0f0e 100%)}
   .ambient-bg::before{content:'';position:absolute;inset:0;
     background-image:url('ambient/lofi-poster.jpg');background-size:cover;background-position:center;
-    filter:blur(8px) brightness(.5);opacity:.7}
+    filter:brightness(.6);opacity:.85}
 }
 
 </style>
@@ -1113,39 +1140,45 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
     </button>
   </div>
 
-  <!-- bottom-left: clock + date -->
-  <div class="aw aw-bl">
-    <div class="aw-clock-time" id="aw-clock-time">00:00</div>
-    <div class="aw-clock-date" id="aw-clock-date">—</div>
-  </div>
-
-  <!-- bottom-right: countdown -->
-  <div class="aw aw-br">
-    <div class="aw-cd-label">próxima entrega</div>
-    <div class="aw-cd-big" id="aw-cd-big">—</div>
-    <div class="aw-cd-title" id="aw-cd-title">—</div>
-    <div class="aw-cd-sub" id="aw-cd-sub"></div>
-  </div>
-
-  <!-- left mid: timer -->
+  <!-- LEFT MID: navigation pills (which view to open) -->
   <div class="aw aw-lm">
-    <div class="aw-section-lbl">temporizador</div>
-    <div class="aw-timer-display" id="aw-timer-display">25:00</div>
-    <div class="aw-timer-ctrl">
-      <button class="aw-timer-btn" onclick="resetTimer()" title="reiniciar">↺</button>
-      <button class="aw-timer-btn primary" id="aw-timer-btn" onclick="toggleTimer()">iniciar</button>
-    </div>
-    <button class="aw-session-btn" id="aw-session-btn" onclick="clickSessionBtn()">iniciar sesión</button>
-  </div>
-
-  <!-- right mid: navigation pills -->
-  <div class="aw aw-rm">
     <div class="aw-section-lbl">vistas</div>
     <button class="aw-nav-pill" onclick="ambientView('hoy')">hoy</button>
     <button class="aw-nav-pill" onclick="ambientView('week')">semana</button>
     <button class="aw-nav-pill" onclick="ambientView('month')">mes</button>
     <button class="aw-nav-pill" onclick="ambientView('gantt')">cuatrimestre</button>
     <button class="aw-nav-pill ghost" onclick="ambientView(null)" id="aw-close-view" style="display:none">cerrar vista</button>
+  </div>
+
+  <!-- RIGHT MID: clock, countdown, timer, session, music -->
+  <div class="aw aw-rm">
+    <!-- clock -->
+    <div class="aw-r-block aw-r-clock">
+      <div class="aw-clock-time" id="aw-clock-time">00:00</div>
+      <div class="aw-clock-date" id="aw-clock-date">—</div>
+    </div>
+
+    <!-- countdown -->
+    <div class="aw-r-block aw-r-countdown">
+      <div class="aw-section-lbl">próxima entrega</div>
+      <div class="aw-cd-big" id="aw-cd-big">—</div>
+      <div class="aw-cd-title" id="aw-cd-title">—</div>
+      <div class="aw-cd-sub" id="aw-cd-sub"></div>
+    </div>
+
+    <!-- timer + session -->
+    <div class="aw-r-block aw-r-timer">
+      <div class="aw-section-lbl">temporizador</div>
+      <div class="aw-timer-display" id="aw-timer-display">25:00</div>
+      <div class="aw-timer-ctrl">
+        <button class="aw-timer-btn" onclick="resetTimer()" title="reiniciar">↺</button>
+        <button class="aw-timer-btn primary" id="aw-timer-btn" onclick="toggleTimer()">iniciar</button>
+      </div>
+      <button class="aw-session-btn" id="aw-session-btn" onclick="clickSessionBtn()">iniciar sesión</button>
+    </div>
+
+    <!-- music slot (the actual music card is moved here when ambient activates) -->
+    <div class="aw-r-block aw-r-music" id="aw-music-slot"></div>
   </div>
 </div>
 
@@ -1323,7 +1356,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
       <div id="tracked-list"></div>
     </div>
 
-    <div class="fp-section music-section" style="padding:0">
+    <div class="fp-section music-section" id="music-section" style="padding:0">
       <div class="music-section-header">
         <div class="music-section-lbl">música</div>
         <button class="music-toggle" id="music-toggle" onclick="toggleMusic()">▾</button>
@@ -4921,6 +4954,24 @@ function toggleAmbient(){
 
 function enterAmbient(){
   ambientOn = true;
+
+  // Move music section into the ambient widget BEFORE applying class
+  // (so it doesn't briefly disappear when .body is hidden by CSS)
+  // Skip on mobile — ambient mode shows the normal UI with blurred bg there
+  const isMobileAmbient = window.matchMedia && window.matchMedia('(max-width: 760px)').matches;
+  if(!isMobileAmbient){
+    const musicCard = document.getElementById('music-section');
+    const musicSlot = document.getElementById('aw-music-slot');
+    if(musicCard && musicSlot && musicCard.parentNode !== musicSlot){
+      musicSlot.appendChild(musicCard);
+      // Force music content to be expanded in ambient mode for visibility
+      const musicContent = document.getElementById('music-content');
+      if(musicContent) musicContent.classList.add('open');
+      const musicToggle = document.getElementById('music-toggle');
+      if(musicToggle) musicToggle.textContent = '▴';
+    }
+  }
+
   document.body.classList.add('ambient-on');
 
   // Lazy-load the video on first activation
@@ -4960,12 +5011,22 @@ function enterAmbient(){
 
 function exitAmbient(){
   ambientOn = false;
+
+  // Restore music section to its original location BEFORE removing class
+  const musicCard = document.getElementById('music-section');
+  const focusPanel = document.querySelector('.focus-panel');
+  if(musicCard && focusPanel && musicCard.parentNode !== focusPanel){
+    focusPanel.appendChild(musicCard);
+  }
+
   document.body.classList.remove('ambient-on');
   document.body.classList.remove('spotlight-on');
   activeAmbientView = null;
+
   // Pause video to save resources
   const video = document.getElementById('ambient-video');
   if(video) video.pause();
+
   // Restore main view to its proper container
   restoreMainFromSpotlight();
 }
