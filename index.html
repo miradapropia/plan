@@ -909,8 +909,7 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
 
 /* video background — hidden by default, visible only when body.ambient-on */
 .ambient-bg{position:fixed;inset:0;z-index:0;display:none;overflow:hidden;background:#0a0a0a}
-.ambient-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
-  background:#0a0a0a}
+.ambient-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .ambient-scrim{display:none}
 .ambient-bg.no-video{background:linear-gradient(135deg,#0f0f0e 0%,#1a1a18 50%,#0a0a0a 100%)}
 .ambient-bg.no-video .ambient-video{display:none}
@@ -1124,7 +1123,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
   .ambient-video{display:none}
   .ambient-bg{background:linear-gradient(135deg,#1a1a18 0%,#0f0f0e 100%)}
   .ambient-bg::before{content:'';position:absolute;inset:0;
-    background-image:url('ambient/lofi-poster.jpg');background-size:contain;background-position:center;background-repeat:no-repeat;background-color:#0a0a0a}
+    background-image:url('ambient/lofi-poster.jpg');background-size:cover;background-position:center;background-color:#0a0a0a}
 }
 
 </style>
