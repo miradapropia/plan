@@ -47,3 +47,10 @@
   for = "/og-image.png"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# ambient mode video and poster — 30 days cache (versioned filenames recommended)
+[[headers]]
+  for = "/ambient/*"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000"
+    Access-Control-Allow-Origin = "*"

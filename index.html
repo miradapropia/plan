@@ -205,11 +205,16 @@ header{border-bottom:1px solid var(--g200);padding:12px 22px;
 
 /* ── SIDEBAR LEFT ── */
 .sidebar{width:170px;border-right:1px solid var(--g200);background:var(--white);
-  display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;transition:transform .25s ease}
+  display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;transition:transform .25s ease;
+  padding-bottom:80px}
 .sb-section{padding:12px 0;border-bottom:1px solid var(--g200)}
 .sb-label{font-size:8px;letter-spacing:2px;color:var(--g400);padding:0 13px 7px}
 .sb-link{display:block;padding:5px 13px;color:var(--g600);text-decoration:none;font-size:11px;transition:color .1s;cursor:pointer}
 .sb-link:hover{color:var(--black)}
+.sb-add-btn{width:18px;height:18px;border:1px solid var(--g300);background:none;color:var(--g400);
+  border-radius:50%;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;font-family:inherit;padding:0;line-height:1}
+.sb-add-btn:hover{border-color:var(--black);color:var(--black);background:var(--g100)}
 .subj-item{display:flex;align-items:center;gap:8px;padding:5px 7px 5px 13px;cursor:pointer;
   border-radius:6px;margin:1px 5px;transition:background .15s;animation:itemFadeIn .25s cubic-bezier(.22,1,.36,1) both;position:relative}
 .subj-item:hover{background:var(--g100)}
@@ -306,7 +311,7 @@ nav.tabs{border-bottom:1px solid var(--g200);display:flex;background:var(--white
   transition:color .15s,background .15s;font-family:'Inter',sans-serif}
 .tab:hover{color:var(--black);background:var(--g100)}
 .tab.active{color:var(--black);background:var(--g100);box-shadow:inset 0 -2px 0 var(--black)}
-.main-view{flex:1;overflow-y:auto;padding:0;position:relative}
+.main-view{flex:1;overflow-y:auto;padding:0 0 80px 0;position:relative}
 .view{display:none}
 .view.active{display:block;animation:viewIn .22s cubic-bezier(.22,1,.36,1)}
 @keyframes viewIn{
@@ -500,7 +505,8 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
 
 /* ── FOCUS PANEL ── */
 .focus-panel{width:268px;border-left:1px solid var(--g200);background:var(--white);
-  display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;transition:transform .25s ease}
+  display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;transition:transform .25s ease;
+  padding-bottom:80px}
 .fp-section{padding:16px 15px;border-bottom:1px solid var(--g200)}
 .fp-label{font-size:8px;letter-spacing:2px;color:var(--g400);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
 .fp-label-action{font-size:9px;color:var(--g400);cursor:pointer;letter-spacing:.5px;text-transform:none}
@@ -557,29 +563,37 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
 .session-log-note{font-size:8.5px;color:var(--g400);font-style:italic;margin-top:2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 
-/* ── IA PANEL (always visible, right of focus panel) ── */
-.ia-panel{width:var(--ia-w);background:var(--white);border-left:1px solid var(--g200);
-  display:flex;flex-direction:column;flex-shrink:0;transition:width .25s cubic-bezier(.22,1,.36,1);
-  position:relative}
-.ia-panel.collapsed{width:var(--ia-w-collapsed)}
-.ia-panel.collapsed .ia-content{opacity:0;pointer-events:none}
-.ia-content{display:flex;flex-direction:column;flex:1;overflow:hidden;transition:opacity .15s}
-.ia-toggle{position:absolute;top:13px;right:auto;left:7px;z-index:30;
-  width:28px;height:28px;border:1px solid var(--g300);background:var(--white);
-  border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  font-size:13px;color:var(--g600);transition:all .15s}
-.ia-toggle:hover{border-color:var(--black);color:var(--black)}
-.ia-panel.collapsed .ia-toggle{left:50%;transform:translateX(-50%)}
+/* ── IA COMMAND BAR (autocad-style, bottom centered) ── */
+.ia-cmd{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:80;
+  width:min(680px, calc(100vw - 28px));
+  background:var(--white);border:1px solid var(--g200);border-radius:14px;
+  box-shadow:0 6px 26px rgba(10,10,10,.10), 0 1px 3px rgba(10,10,10,.06);
+  display:flex;flex-direction:column;overflow:hidden;
+  transition:max-height .35s cubic-bezier(.22,1,.36,1);
+  max-height:54px}
+.ia-cmd.open{max-height:min(620px, calc(100vh - 36px))}
+html.dark .ia-cmd{box-shadow:0 6px 26px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.3)}
 
-.ia-head{padding:13px 18px 13px 44px;border-bottom:1px solid var(--g200);
-  display:flex;align-items:center;gap:8px;flex-shrink:0;height:54px}
-.ia-head-title{font-size:9px;font-weight:600;letter-spacing:2px}
-.ia-head-status{font-size:8px;color:var(--g400);margin-left:auto;letter-spacing:.5px}
+.ia-cmd-conversation{display:flex;flex-direction:column;flex:1;overflow:hidden;
+  opacity:0;pointer-events:none;transition:opacity .25s ease}
+.ia-cmd.open .ia-cmd-conversation{opacity:1;pointer-events:auto}
 
-.ia-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;
-  scrollbar-width:thin;scrollbar-color:var(--g200) transparent}
-.ia-msgs::-webkit-scrollbar{width:3px}
-.ia-msgs::-webkit-scrollbar-thumb{background:var(--g200)}
+.ia-cmd-conv-head{padding:11px 16px;border-bottom:1px solid var(--g200);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ia-cmd-conv-title{display:flex;align-items:center;gap:8px;font-size:9px;
+  font-weight:600;letter-spacing:2px}
+.ia-cmd-mark{font-size:11px;color:var(--g600)}
+.ia-cmd-status{margin-left:6px;font-weight:400;color:var(--g400);font-size:8px;letter-spacing:.5px}
+.ia-cmd-close{width:22px;height:22px;border:1px solid var(--g300);border-radius:5px;
+  background:none;color:var(--g600);cursor:pointer;font-size:10px;display:flex;
+  align-items:center;justify-content:center;transition:all .15s;font-family:inherit}
+.ia-cmd-close:hover{border-color:var(--black);color:var(--black)}
+
+.ia-cmd-msgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;
+  gap:10px;scrollbar-width:thin;scrollbar-color:var(--g200) transparent;min-height:120px}
+.ia-cmd-msgs::-webkit-scrollbar{width:3px}
+.ia-cmd-msgs::-webkit-scrollbar-thumb{background:var(--g200)}
+
 .ia-msg{display:flex;flex-direction:column;gap:3px;animation:msgIn .25s cubic-bezier(.22,1,.36,1)}
 @keyframes msgIn{
   from{opacity:0;transform:translateY(4px)}
@@ -588,10 +602,10 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
 .ia-msg.user{align-items:flex-end}
 .ia-msg.assistant{align-items:flex-start}
 .ia-msg-lbl{font-size:8px;letter-spacing:1.5px;color:var(--g400)}
-.ia-bubble{max-width:92%;padding:9px 12px;font-size:11.5px;line-height:1.55;
-  word-wrap:break-word}
+.ia-bubble{max-width:88%;padding:9px 12px;font-size:11.5px;line-height:1.55;word-wrap:break-word}
 .ia-msg.assistant .ia-bubble{background:var(--g100);border:1px solid var(--g200);border-radius:4px 12px 12px 12px}
 .ia-msg.user .ia-bubble{background:var(--black);color:var(--white);border-radius:12px 4px 12px 12px}
+html.dark .ia-msg.user .ia-bubble{background:#f0f0eb;color:#0f0f0e}
 
 .ia-confirm{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
 .ia-confirm-btn{padding:5px 11px;border-radius:14px;font-size:9px;letter-spacing:.8px;
@@ -601,8 +615,7 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
 .ia-confirm-btn.primary{background:var(--black);color:var(--white);border-color:var(--black)}
 .ia-confirm-btn.primary:hover{opacity:.85}
 
-/* upload zone integrated */
-.ia-upload{padding:8px 12px;border-top:1px solid var(--g200);flex-shrink:0;display:none}
+.ia-upload{padding:8px 14px;border-top:1px solid var(--g200);flex-shrink:0;display:none}
 .ia-upload.has-files{display:block}
 .file-chips{display:flex;flex-wrap:wrap;gap:5px}
 .file-chip{display:flex;align-items:center;gap:5px;padding:3px 7px 3px 5px;
@@ -614,20 +627,30 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
 .chip-type-pdf{border-left:3px solid #C17817}
 .chip-type-img{border-left:3px solid #4A7C7E}
 
-.ia-input-row{padding:10px 12px;border-top:1px solid var(--g200);display:flex;gap:6px;flex-shrink:0;align-items:flex-end;background:var(--white)}
-.ia-attach{width:34px;height:34px;border:1px solid var(--g300);border-radius:6px;background:none;
+.ia-cmd-bar{display:flex;align-items:center;gap:6px;padding:8px 10px;flex-shrink:0;height:54px;background:var(--white)}
+.ia-cmd.open .ia-cmd-bar{border-top:1px solid var(--g200)}
+.ia-cmd-prefix{flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  width:24px;height:34px;color:var(--g400)}
+.ia-cmd-mark-small{font-size:13px;font-weight:300;letter-spacing:0}
+.ia-attach{width:34px;height:34px;border:1px solid var(--g300);border-radius:7px;background:none;
   cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--g600);
-  transition:all .15s;flex-shrink:0;position:relative}
+  transition:all .15s;flex-shrink:0;position:relative;font-family:inherit}
 .ia-attach:hover{border-color:var(--black);color:var(--black)}
 .ia-attach input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
-.ia-input{flex:1;border:1px solid var(--g200);border-radius:var(--r);padding:8px 11px;
-  font-family:'Inter',sans-serif;font-size:11.5px;background:var(--g100);outline:none;
-  resize:none;min-height:34px;max-height:120px;line-height:1.4;
-  transition:border-color .15s}
-.ia-input:focus{border-color:var(--black)}
-.ia-send{width:34px;height:34px;border:none;border-radius:6px;background:var(--black);color:var(--white);
+.ia-input{flex:1;border:1px solid var(--g200);border-radius:7px;padding:8px 11px;
+  font-family:'Inter',sans-serif;font-size:12px;background:var(--g100);outline:none;
+  resize:none;min-height:34px;max-height:96px;line-height:1.4;
+  transition:border-color .15s;color:var(--black)}
+.ia-input:focus{border-color:var(--black);background:var(--white)}
+.ia-input::placeholder{color:var(--g400)}
+.ia-cmd-expand{width:30px;height:34px;border:none;background:none;color:var(--g400);
+  cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-family:inherit;transition:color .15s,transform .25s}
+.ia-cmd-expand:hover{color:var(--black)}
+.ia-cmd.open .ia-cmd-expand{transform:rotate(180deg)}
+.ia-send{width:34px;height:34px;border:none;border-radius:7px;background:var(--black);color:var(--white);
   cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;transition:opacity .15s}
+  flex-shrink:0;transition:opacity .15s;font-family:inherit}
 .ia-send:hover{opacity:.85}
 .ia-send:disabled{opacity:.3;cursor:not-allowed}
 
@@ -664,6 +687,14 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
   transition:border-color .15s}
 .modal-input:focus,.modal-select:focus,.modal-textarea:focus{border-color:var(--black)}
 .modal-textarea{resize:vertical;min-height:60px;line-height:1.5}
+
+/* color picker for subject modal */
+.color-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:6px}
+.color-swatch{width:100%;aspect-ratio:1;border-radius:50%;cursor:pointer;
+  border:2px solid transparent;transition:all .15s;position:relative}
+.color-swatch:hover{transform:scale(1.1)}
+.color-swatch.selected{border-color:var(--black);box-shadow:inset 0 0 0 2px var(--white)}
+html.dark .color-swatch.selected{box-shadow:inset 0 0 0 2px var(--g100)}
 .modal-foot{padding:12px 18px;border-top:1px solid var(--g200);display:flex;justify-content:space-between;align-items:center;gap:8px}
 .modal-btn{padding:7px 14px;border-radius:20px;font-size:9px;letter-spacing:1.2px;
   cursor:pointer;border:1px solid var(--g300);background:var(--white);color:var(--black);
@@ -730,18 +761,15 @@ html.dark .modal-btn.danger:hover{background:#2a1a1a}
   font-size:14px;cursor:pointer;align-items:center;justify-content:center;
   box-shadow:0 2px 12px rgba(0,0,0,.18);transition:opacity .15s}
 .sb-toggle:hover{opacity:.85}
-.sb-toggle-left{bottom:18px;left:14px}
-.sb-toggle-right{bottom:18px;right:14px}
-.sb-toggle-ia{bottom:64px;right:14px;background:var(--white);color:var(--black);border:1px solid var(--g300)}
+.sb-toggle-left{bottom:78px;left:14px}
+.sb-toggle-right{bottom:78px;right:14px}
+.sb-toggle-ia{display:none}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:89}
 .sb-overlay.show{display:block}
 
-@media (max-width:1100px){
-  .ia-panel{position:fixed;top:0;right:0;height:100vh;z-index:90;
-    transform:translateX(100%);box-shadow:-2px 0 12px rgba(0,0,0,.15)}
-  .ia-panel.open-mobile{transform:translateX(0)}
-  .ia-panel.collapsed{display:none}
-  .sb-toggle-ia{display:flex}
+/* On narrow screens, command bar uses available width */
+@media (max-width:760px){
+  .ia-cmd{bottom:8px;width:calc(100vw - 16px);border-radius:12px}
 }
 
 @media (max-width:900px){
@@ -874,9 +902,253 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
 
 /* ── EVENT MARKER WITH ATTACHMENT INDICATOR ── */
 .cal-ev .ev-mark-icon{display:inline-block;font-size:7px;margin-right:2px;opacity:.85}
+
+/* ════════════════════════════════════════════════════════
+   AMBIENT MODE — modo de concentración con video lofi de fondo
+   ════════════════════════════════════════════════════════ */
+
+/* video background — hidden by default, visible only when body.ambient-on */
+.ambient-bg{position:fixed;inset:0;z-index:0;display:none;overflow:hidden;background:#0a0a0a}
+.ambient-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  filter:blur(6px) brightness(.55) saturate(.9);transform:scale(1.05);
+  transition:filter .6s cubic-bezier(.22,1,.36,1)}
+.ambient-scrim{position:absolute;inset:0;background:radial-gradient(ellipse at center,
+  rgba(10,10,10,0) 30%,rgba(10,10,10,.4) 100%);pointer-events:none}
+.ambient-bg.no-video{background:linear-gradient(135deg,#0f0f0e 0%,#1a1a18 50%,#0a0a0a 100%)}
+.ambient-bg.no-video .ambient-video{display:none}
+
+/* corner widgets — hidden by default */
+.ambient-widgets{position:fixed;inset:0;z-index:75;pointer-events:none;display:none}
+.ambient-widgets .aw{position:absolute;pointer-events:auto;
+  animation:awFadeIn .6s cubic-bezier(.22,1,.36,1) both}
+@keyframes awFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.aw-tl{top:18px;left:22px;animation-delay:.1s}
+.aw-tr{top:18px;right:22px;animation-delay:.15s}
+.aw-bl{bottom:88px;left:22px;animation-delay:.25s}
+.aw-br{bottom:88px;right:22px;animation-delay:.3s;text-align:right}
+.aw-lm{top:50%;left:22px;transform:translateY(-50%);animation-delay:.35s}
+.aw-rm{top:50%;right:22px;transform:translateY(-50%);animation-delay:.4s;
+  display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+
+/* ambient widget styles — text on dark video */
+.aw-exit{width:36px;height:36px;border:1px solid rgba(255,255,255,.18);
+  background:rgba(0,0,0,.4);color:rgba(255,255,255,.85);
+  border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-family:inherit;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  transition:all .2s}
+.aw-exit:hover{background:rgba(0,0,0,.6);border-color:rgba(255,255,255,.4);transform:scale(1.05)}
+
+.aw-clock-time{font-size:64px;font-weight:200;letter-spacing:-3px;line-height:1;
+  color:rgba(255,255,255,.92);font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+.aw-clock-date{font-size:11px;letter-spacing:2px;color:rgba(255,255,255,.55);margin-top:6px;text-transform:lowercase}
+
+.aw-cd-label{font-size:9px;letter-spacing:2.5px;color:rgba(255,255,255,.5);margin-bottom:4px}
+.aw-cd-big{font-size:48px;font-weight:200;letter-spacing:-2px;line-height:1;
+  color:rgba(255,255,255,.95);font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+.aw-cd-big.urgent{color:#ff8585}
+.aw-cd-title{font-size:12px;color:rgba(255,255,255,.7);margin-top:6px;line-height:1.3;max-width:240px;
+  margin-left:auto}
+.aw-cd-sub{font-size:9px;color:rgba(255,255,255,.45);margin-top:3px;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+
+/* timer + sessions floating widget */
+.aw-lm{padding:14px 16px;background:rgba(0,0,0,.35);
+  backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.1);border-radius:12px;width:160px}
+.aw-section-lbl{font-size:8px;letter-spacing:2px;color:rgba(255,255,255,.45);margin-bottom:9px;text-align:center}
+.aw-timer-display{font-size:32px;font-weight:200;letter-spacing:-1.5px;line-height:1;text-align:center;
+  color:rgba(255,255,255,.95);font-variant-numeric:tabular-nums;margin-bottom:9px}
+.aw-timer-ctrl{display:flex;justify-content:center;gap:5px;margin-bottom:7px}
+.aw-timer-btn{padding:5px 11px;border:1px solid rgba(255,255,255,.18);background:transparent;
+  color:rgba(255,255,255,.8);border-radius:18px;font-size:8px;letter-spacing:1px;cursor:pointer;
+  font-family:inherit;transition:all .15s}
+.aw-timer-btn:hover{border-color:rgba(255,255,255,.5);color:rgba(255,255,255,1)}
+.aw-timer-btn.primary{background:rgba(255,255,255,.92);color:#0a0a0a;border-color:rgba(255,255,255,.92)}
+.aw-timer-btn.primary:hover{background:rgba(255,255,255,1)}
+.aw-session-btn{width:100%;padding:6px;border:1px solid rgba(255,255,255,.15);background:transparent;
+  color:rgba(255,255,255,.7);border-radius:6px;font-size:9px;letter-spacing:.8px;cursor:pointer;
+  font-family:inherit;transition:all .15s}
+.aw-session-btn:hover{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.95)}
+.aw-session-btn.running{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3)}
+
+/* nav pills floating widget */
+.aw-rm{padding:14px 14px;background:rgba(0,0,0,.35);
+  backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.1);border-radius:12px;width:140px;align-items:stretch}
+.aw-rm .aw-section-lbl{text-align:left;margin-bottom:9px}
+.aw-nav-pill{padding:8px 12px;border:1px solid rgba(255,255,255,.15);background:transparent;
+  color:rgba(255,255,255,.78);border-radius:8px;font-size:11px;letter-spacing:.5px;
+  cursor:pointer;font-family:inherit;text-align:left;transition:all .15s}
+.aw-nav-pill:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3);color:rgba(255,255,255,1)}
+.aw-nav-pill.active{background:rgba(255,255,255,.92);color:#0a0a0a;border-color:rgba(255,255,255,.92)}
+.aw-nav-pill.ghost{font-size:9px;color:rgba(255,255,255,.5);letter-spacing:1px;border-color:transparent;
+  margin-top:2px;text-align:center;font-style:italic}
+.aw-nav-pill.ghost:hover{background:rgba(0,0,0,.3);color:rgba(255,255,255,.85)}
+
+/* ── WHEN AMBIENT IS ON ── */
+body.ambient-on .ambient-bg{display:block}
+body.ambient-on .ambient-widgets{display:block}
+
+/* hide the regular app shell — only command bar stays */
+body.ambient-on header{background:transparent;border-bottom:1px solid rgba(255,255,255,.06);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  position:fixed;top:0;left:0;right:0;z-index:78}
+body.ambient-on header .logo{color:rgba(255,255,255,.92)}
+body.ambient-on header .logo-mark{border-color:rgba(255,255,255,.85);color:rgba(255,255,255,.92)}
+body.ambient-on header .hb{color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.18);background:transparent}
+body.ambient-on header .hb:hover{color:rgba(255,255,255,1);border-color:rgba(255,255,255,.5)}
+body.ambient-on header .hb#ambient-btn{background:rgba(255,255,255,.92);color:#0a0a0a;border-color:rgba(255,255,255,.92)}
+
+body.ambient-on .body{display:none}
+body.ambient-on .toast{z-index:200}
+
+/* keep ia command bar visible */
+body.ambient-on .ia-cmd{background:rgba(0,0,0,.5);border-color:rgba(255,255,255,.15);
+  backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);
+  box-shadow:0 6px 32px rgba(0,0,0,.45)}
+body.ambient-on .ia-cmd .ia-input{background:rgba(255,255,255,.08);color:rgba(255,255,255,.95);
+  border-color:rgba(255,255,255,.15)}
+body.ambient-on .ia-cmd .ia-input::placeholder{color:rgba(255,255,255,.45)}
+body.ambient-on .ia-cmd .ia-input:focus{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.4)}
+body.ambient-on .ia-cmd-mark-small,body.ambient-on .ia-cmd-mark{color:rgba(255,255,255,.6)}
+body.ambient-on .ia-attach{border-color:rgba(255,255,255,.18);color:rgba(255,255,255,.65);background:transparent}
+body.ambient-on .ia-attach:hover{border-color:rgba(255,255,255,.5);color:rgba(255,255,255,.95)}
+body.ambient-on .ia-cmd-expand{color:rgba(255,255,255,.5)}
+body.ambient-on .ia-cmd-expand:hover{color:rgba(255,255,255,.95)}
+body.ambient-on .ia-send{background:rgba(255,255,255,.92);color:#0a0a0a}
+body.ambient-on .ia-send:hover{background:rgba(255,255,255,1)}
+body.ambient-on .ia-cmd-conv-head{border-color:rgba(255,255,255,.1)}
+body.ambient-on .ia-cmd-conv-title{color:rgba(255,255,255,.85)}
+body.ambient-on .ia-cmd-status{color:rgba(255,255,255,.4)}
+body.ambient-on .ia-cmd-close{border-color:rgba(255,255,255,.18);color:rgba(255,255,255,.7);background:transparent}
+body.ambient-on .ia-cmd-close:hover{border-color:rgba(255,255,255,.5);color:rgba(255,255,255,1)}
+body.ambient-on .ia-msg.assistant .ia-bubble{background:rgba(255,255,255,.08);
+  border-color:rgba(255,255,255,.12);color:rgba(255,255,255,.92)}
+body.ambient-on .ia-msg.user .ia-bubble{background:rgba(255,255,255,.92);color:#0a0a0a}
+body.ambient-on .ia-msg-lbl{color:rgba(255,255,255,.45)}
+body.ambient-on .ia-changelog{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08)}
+body.ambient-on .ia-changelog-item{border-color:rgba(255,255,255,.06);color:rgba(255,255,255,.7)}
+body.ambient-on .ia-changelog-icon{color:rgba(255,255,255,.85)}
+body.ambient-on .ia-changelog-time{color:rgba(255,255,255,.4)}
+
+/* ── SPOTLIGHT — when a view is opened over the ambient bg ── */
+body.ambient-on.spotlight-on .ambient-video{filter:blur(20px) brightness(.35) saturate(.7)}
+
+/* When .main is inside the spotlight, hide its native nav tabs */
+.spotlight-body .main nav.tabs{display:none}
+.spotlight-body .main{height:100%}
+.spotlight-body .main-view{height:100%;padding:0 0 24px 0}
+
+.spotlight{position:fixed;top:80px;left:50%;transform:translateX(-50%);
+  width:min(960px,calc(100vw - 60px));
+  height:calc(100vh - 80px - 80px);
+  z-index:77;
+  background:var(--white);border:1px solid var(--g200);border-radius:14px;
+  box-shadow:0 18px 60px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.3);
+  overflow:hidden;display:none;flex-direction:column;
+  animation:spotlightIn .35s cubic-bezier(.22,1,.36,1)}
+@keyframes spotlightIn{
+  from{opacity:0;transform:translateX(-50%) translateY(8px) scale(.98)}
+  to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+}
+body.ambient-on.spotlight-on .spotlight{display:flex}
+
+.spotlight-head{padding:14px 22px;border-bottom:1px solid var(--g200);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--white)}
+.spotlight-tabs{display:flex;gap:4px}
+.spotlight-tab{padding:6px 12px;font-size:9px;letter-spacing:1.5px;color:var(--g400);
+  cursor:pointer;border:none;background:none;border-radius:5px;
+  transition:all .15s;font-family:inherit}
+.spotlight-tab:hover{color:var(--black);background:var(--g100)}
+.spotlight-tab.active{color:var(--black);background:var(--g100)}
+.spotlight-close{width:28px;height:28px;border:1px solid var(--g300);background:none;
+  color:var(--g600);border-radius:7px;cursor:pointer;font-size:13px;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:inherit}
+.spotlight-close:hover{border-color:var(--black);color:var(--black)}
+.spotlight-body{flex:1;overflow-y:auto}
+
+/* MOBILE: in ambient mode, show full UI with blurred video bg */
+@media (max-width:760px){
+  body.ambient-on .body{display:flex}
+  body.ambient-on .ambient-widgets{display:none}
+  body.ambient-on header{position:relative;background:rgba(255,255,255,.85);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  html.dark body.ambient-on header{background:rgba(15,15,14,.85)}
+  body.ambient-on .sidebar,body.ambient-on .focus-panel,body.ambient-on .main{
+    background:rgba(250,250,250,.88);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  html.dark body.ambient-on .sidebar,html.dark body.ambient-on .focus-panel,html.dark body.ambient-on .main{
+    background:rgba(15,15,14,.88)}
+  body.ambient-on .ambient-video{filter:blur(20px) brightness(.55)}
+}
+
+/* respect reduced motion */
+@media (prefers-reduced-motion:reduce){
+  .ambient-video{display:none}
+  .ambient-bg{background:linear-gradient(135deg,#1a1a18 0%,#0f0f0e 100%)}
+  .ambient-bg::before{content:'';position:absolute;inset:0;
+    background-image:url('ambient/lofi-poster.jpg');background-size:cover;background-position:center;
+    filter:blur(8px) brightness(.5);opacity:.7}
+}
+
 </style>
 </head>
 <body>
+
+<!-- ═══ AMBIENT MODE ═══ -->
+<div class="ambient-bg" id="ambient-bg" aria-hidden="true">
+  <video class="ambient-video" id="ambient-video"
+    muted loop playsinline preload="none"
+    poster="ambient/lofi-poster.jpg">
+  </video>
+  <div class="ambient-scrim"></div>
+</div>
+
+<!-- corner widgets shown only when ambient mode is on -->
+<div class="ambient-widgets" id="ambient-widgets" aria-hidden="true">
+  <!-- top-left: exit button -->
+  <div class="aw aw-tl">
+    <button class="aw-exit" onclick="toggleAmbient()" title="salir del modo ambiente · esc">
+      <span style="font-size:11px">✕</span>
+    </button>
+  </div>
+
+  <!-- bottom-left: clock + date -->
+  <div class="aw aw-bl">
+    <div class="aw-clock-time" id="aw-clock-time">00:00</div>
+    <div class="aw-clock-date" id="aw-clock-date">—</div>
+  </div>
+
+  <!-- bottom-right: countdown -->
+  <div class="aw aw-br">
+    <div class="aw-cd-label">próxima entrega</div>
+    <div class="aw-cd-big" id="aw-cd-big">—</div>
+    <div class="aw-cd-title" id="aw-cd-title">—</div>
+    <div class="aw-cd-sub" id="aw-cd-sub"></div>
+  </div>
+
+  <!-- left mid: timer -->
+  <div class="aw aw-lm">
+    <div class="aw-section-lbl">temporizador</div>
+    <div class="aw-timer-display" id="aw-timer-display">25:00</div>
+    <div class="aw-timer-ctrl">
+      <button class="aw-timer-btn" onclick="resetTimer()" title="reiniciar">↺</button>
+      <button class="aw-timer-btn primary" id="aw-timer-btn" onclick="toggleTimer()">iniciar</button>
+    </div>
+    <button class="aw-session-btn" id="aw-session-btn" onclick="clickSessionBtn()">iniciar sesión</button>
+  </div>
+
+  <!-- right mid: navigation pills -->
+  <div class="aw aw-rm">
+    <div class="aw-section-lbl">vistas</div>
+    <button class="aw-nav-pill" onclick="ambientView('hoy')">hoy</button>
+    <button class="aw-nav-pill" onclick="ambientView('week')">semana</button>
+    <button class="aw-nav-pill" onclick="ambientView('month')">mes</button>
+    <button class="aw-nav-pill" onclick="ambientView('gantt')">cuatrimestre</button>
+    <button class="aw-nav-pill ghost" onclick="ambientView(null)" id="aw-close-view" style="display:none">cerrar vista</button>
+  </div>
+</div>
+
 <div class="app">
 <div class="toast" id="toast"></div>
 
@@ -885,6 +1157,9 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
     <div class="logo-mark">p</div>plan
   </a>
   <div class="header-actions" style="position:relative">
+    <button class="hb" id="ambient-btn" onclick="toggleAmbient()" title="modo ambiente · cmd+shift+l">
+      <span id="ambient-icon">◐</span>
+    </button>
     <button class="hb" id="theme-btn" onclick="toggleTheme()" title="modo oscuro / claro">
       <span id="theme-icon">☾</span>
     </button>
@@ -912,7 +1187,7 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
   <div class="sb-overlay" id="sb-overlay" onclick="closeSidebars()"></div>
   <button class="sb-toggle sb-toggle-left" onclick="toggleLeft()" title="asignaturas">☰</button>
   <button class="sb-toggle sb-toggle-right" onclick="toggleRight()" title="temporizador">⏱</button>
-  <button class="sb-toggle sb-toggle-ia" onclick="toggleIaMobile()" title="ia">✦</button>
+  <button class="sb-toggle sb-toggle-ia" onclick="openIaCmd();document.getElementById('ia-input').focus()" title="ia">✦</button>
 
   <!-- LEFT SIDEBAR -->
   <aside class="sidebar">
@@ -922,7 +1197,10 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
       <a href="https://miradapropia.org/recursos-estudiantes-arquitectura/" class="sb-link" target="_blank">taller ↗</a>
     </div>
     <div class="sb-section" style="flex:1">
-      <div class="sb-label">asignaturas</div>
+      <div class="sb-label" style="display:flex;justify-content:space-between;align-items:center;padding-right:13px">
+        <span>asignaturas</span>
+        <button class="sb-add-btn" onclick="openSubjectCreate()" title="añadir asignatura">+</button>
+      </div>
       <div id="subjects-list"></div>
     </div>
   </aside>
@@ -1068,38 +1346,60 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
 
   </aside>
 
-  <!-- IA PANEL (always visible, collapsible) -->
-  <aside class="ia-panel" id="ia-panel">
-    <button class="ia-toggle" onclick="toggleIaPanel()" title="colapsar / expandir">✦</button>
-    <div class="ia-content">
-      <div class="ia-head">
-        <div class="ia-head-title">ia · planificar</div>
-        <div class="ia-head-status" id="ia-status">listo</div>
-      </div>
-      <div class="ia-msgs" id="ia-msgs"></div>
-      <div class="ia-changelog" id="ia-changelog">
-        <div class="ia-changelog-lbl">
-          <span>cambios recientes</span>
-          <button class="ia-changelog-clear" onclick="clearChangelog()">limpiar</button>
-        </div>
-        <div id="ia-changelog-list"></div>
-      </div>
-      <div class="ia-upload" id="ia-upload">
-        <div class="file-chips" id="file-chips"></div>
-      </div>
-      <div class="ia-input-row">
-        <button class="ia-attach" title="adjuntar archivos">
-          <span>⊕</span>
-          <input type="file" id="file-input" multiple accept=".pdf,image/png,image/jpeg" onchange="handleFileSelect(event)">
-        </button>
-        <textarea class="ia-input" id="ia-input"
-          placeholder="escribe a la ia..." onkeydown="iaKey(event)" oninput="autoResize(this)"></textarea>
-        <button class="ia-send" id="ia-send" onclick="sendMsg()">↑</button>
-      </div>
-    </div>
-  </aside>
-
 </div>
+</div>
+
+<!-- SPOTLIGHT — view appears here when a nav pill is clicked in ambient mode -->
+<div class="spotlight" id="spotlight">
+  <div class="spotlight-head">
+    <div class="spotlight-tabs">
+      <button class="spotlight-tab" onclick="ambientView('hoy')" data-view="hoy">hoy</button>
+      <button class="spotlight-tab" onclick="ambientView('week')" data-view="week">semana</button>
+      <button class="spotlight-tab" onclick="ambientView('month')" data-view="month">mes</button>
+      <button class="spotlight-tab" onclick="ambientView('gantt')" data-view="gantt">cuatrimestre</button>
+    </div>
+    <button class="spotlight-close" onclick="ambientView(null)" title="cerrar · esc">✕</button>
+  </div>
+  <div class="spotlight-body" id="spotlight-body"></div>
+</div>
+
+<!-- IA COMMAND BAR (bottom centered, autocad-style) -->
+<div class="ia-cmd" id="ia-cmd">
+  <div class="ia-cmd-conversation" id="ia-cmd-conversation">
+    <div class="ia-cmd-conv-head">
+      <div class="ia-cmd-conv-title">
+        <span class="ia-cmd-mark">✦</span>
+        <span>planificar con ia</span>
+        <span class="ia-cmd-status" id="ia-status">listo</span>
+      </div>
+      <button class="ia-cmd-close" onclick="closeIaCmd()" title="cerrar">✕</button>
+    </div>
+    <div class="ia-cmd-msgs" id="ia-msgs"></div>
+    <div class="ia-changelog" id="ia-changelog">
+      <div class="ia-changelog-lbl">
+        <span>cambios recientes</span>
+        <button class="ia-changelog-clear" onclick="clearChangelog()">limpiar</button>
+      </div>
+      <div id="ia-changelog-list"></div>
+    </div>
+  </div>
+  <div class="ia-upload" id="ia-upload">
+    <div class="file-chips" id="file-chips"></div>
+  </div>
+  <div class="ia-cmd-bar">
+    <div class="ia-cmd-prefix">
+      <span class="ia-cmd-mark-small">✦</span>
+    </div>
+    <button class="ia-attach" title="adjuntar archivos">
+      <span>⊕</span>
+      <input type="file" id="file-input" multiple accept=".pdf,image/png,image/jpeg" onchange="handleFileSelect(event)">
+    </button>
+    <textarea class="ia-input" id="ia-input"
+      placeholder="planifica · pregunta · sube tu horario..." onkeydown="iaKey(event)" 
+      oninput="autoResize(this)" onfocus="openIaCmd()"></textarea>
+    <button class="ia-cmd-expand" id="ia-cmd-expand" onclick="toggleIaCmd()" title="expandir / contraer">▴</button>
+    <button class="ia-send" id="ia-send" onclick="sendMsg()">↑</button>
+  </div>
 </div>
 
 <!-- MODAL: edit/add event -->
@@ -1163,6 +1463,7 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
     </div>
     <div class="modal-foot">
       <button class="modal-btn danger" id="ev-delete" onclick="deleteCurrentEvent()" style="display:none">eliminar</button>
+      <button class="modal-btn" id="ev-duplicate" onclick="duplicateCurrentEvent()" style="display:none">duplicar</button>
       <div style="display:flex;gap:8px;margin-left:auto">
         <button class="modal-btn" onclick="closeModalForce('modal-event')">cancelar</button>
         <button class="modal-btn primary" onclick="saveEvent()">guardar</button>
@@ -1276,7 +1577,7 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
     <div class="modal-body">
       <div class="modal-field">
         <label class="modal-field-lbl" id="note-context-lbl">fecha: —</label>
-        <textarea class="modal-textarea" id="note-text" placeholder="escribe una nota breve..." maxlength="200"></textarea>
+        <textarea class="modal-textarea" id="note-text" placeholder="escribe una nota..." style="min-height:120px"></textarea>
       </div>
     </div>
     <div class="modal-foot">
@@ -1299,13 +1600,44 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
     <div class="modal-body">
       <div class="modal-field">
         <label class="modal-field-lbl" id="journal-subj-lbl">—</label>
-        <textarea class="modal-textarea" id="journal-text" placeholder="¿qué hiciste? (opcional)" maxlength="200"></textarea>
+        <textarea class="modal-textarea" id="journal-text" placeholder="¿qué hiciste? (opcional)" style="min-height:80px"></textarea>
       </div>
     </div>
     <div class="modal-foot">
       <div style="display:flex;gap:8px;margin-left:auto">
         <button class="modal-btn" onclick="saveJournal(true)">omitir</button>
         <button class="modal-btn primary" onclick="saveJournal(false)">guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: create / edit subject -->
+<div class="modal-overlay" id="modal-subject" onclick="closeModal(event,'modal-subject')">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head">
+      <div class="modal-title" id="subject-modal-title">nueva asignatura</div>
+      <button class="modal-close" onclick="closeModalForce('modal-subject')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label class="modal-field-lbl">nombre</label>
+        <input class="modal-input" id="subj-name" placeholder="ej: estructuras 3"/>
+      </div>
+      <div class="modal-field">
+        <label class="modal-field-lbl">color</label>
+        <div class="color-grid" id="subj-colors"></div>
+      </div>
+      <div class="modal-field" style="margin-bottom:0">
+        <label class="modal-field-lbl">horas semanales (opcional)</label>
+        <input class="modal-input" type="number" id="subj-hours" min="0" max="40" step="1" placeholder="6"/>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="modal-btn danger" id="subj-delete" onclick="deleteCurrentSubject()" style="display:none">eliminar</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="modal-btn" onclick="closeModalForce('modal-subject')">cancelar</button>
+        <button class="modal-btn primary" onclick="saveSubject()">guardar</button>
       </div>
     </div>
   </div>
@@ -1419,7 +1751,10 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
         </div>
         <div class="subj-detail-stats" id="subj-detail-stats"></div>
       </div>
-      <button class="subj-detail-close" onclick="closeSubjectDetail()">✕</button>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="subj-detail-close" onclick="editSubjectFromDetail()" title="editar asignatura" style="font-size:13px">✎</button>
+        <button class="subj-detail-close" onclick="closeSubjectDetail()" title="cerrar">✕</button>
+      </div>
     </div>
     <div class="subj-detail-body" id="subj-detail-body"></div>
   </div>
@@ -1725,9 +2060,13 @@ function buildPDFHTML(scope, data){
           </tr>`;
         } else {
           const e = it.item; const sub = subjMap[e.subj];
+          const notesLine = (e.notes && e.notes.trim())
+            ? `<div class="ev-extra ev-notes">${e.notes.replace(/\n/g,'<br>')}</div>` : '';
+          const linksLine = (e.links && e.links.length)
+            ? `<div class="ev-extra">enlaces: ${e.links.map(l => l.url).join(' · ')}</div>` : '';
           body += `<tr>
             <td class="time">${e.type}</td>
-            <td><span class="dot" style="background:${sub?.color||'#999'}"></span><strong>${e.title}</strong> <span class="sub">${sub?.name||''}</span></td>
+            <td><span class="dot" style="background:${sub?.color||'#999'}"></span><strong>${e.title}</strong> <span class="sub">${sub?.name||''}</span>${notesLine}${linksLine}</td>
           </tr>`;
         }
       });
@@ -1775,9 +2114,14 @@ function buildPDFHTML(scope, data){
       data.events.sort((a,b) => new Date(a.date)-new Date(b.date)).forEach(e => {
         const sub = subjMap[e.subj];
         const d = new Date(e.date);
+        const linksHtml = (e.links && e.links.length)
+          ? `<div class="ev-extra">enlaces: ${e.links.map(l => l.url).join(' · ')}</div>` : '';
+        const notesHtml = (e.notes && e.notes.trim())
+          ? `<div class="ev-extra ev-notes">${e.notes.replace(/\n/g,'<br>')}</div>` : '';
         body += `<li><span class="dot" style="background:${sub?.color||'#999'}"></span>
           <strong>${d.getDate()}/${d.getMonth()+1}</strong> · ${e.type} · ${e.title} <span class="sub">(${sub?.name||''})</span>
-          ${e.done ? '<span class="done-mark">✓</span>' : ''}</li>`;
+          ${e.done ? '<span class="done-mark">✓</span>' : ''}
+          ${notesHtml}${linksHtml}</li>`;
       });
       body += `</ul>`;
     }
@@ -1823,8 +2167,13 @@ function buildPDFHTML(scope, data){
         body += `<ul class="ev-list">`;
         subjEvs.forEach(e => {
           const d = new Date(e.date);
+          const linksHtml = (e.links && e.links.length)
+            ? `<div class="ev-extra">enlaces: ${e.links.map(l => l.url).join(' · ')}</div>` : '';
+          const notesHtml = (e.notes && e.notes.trim())
+            ? `<div class="ev-extra ev-notes">${e.notes.replace(/\n/g,'<br>')}</div>` : '';
           body += `<li><strong>${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}</strong> · ${e.type} · ${e.title}
-            ${e.done ? '<span class="done-mark">✓</span>' : ''}</li>`;
+            ${e.done ? '<span class="done-mark">✓</span>' : ''}
+            ${notesHtml}${linksHtml}</li>`;
         });
         body += `</ul>`;
       } else {
@@ -1887,6 +2236,8 @@ function buildPDFHTML(scope, data){
   .ev-list{list-style:none}
   .ev-list li{padding:4px 0;border-bottom:1px solid #f0f0ec;font-size:10px}
   .ev-list li:last-child{border-bottom:none}
+  .ev-extra{margin-top:3px;margin-left:14px;font-size:9px;color:#666;line-height:1.5}
+  .ev-notes{font-style:italic;color:#444;padding:5px 8px;background:#FFF8E1;border-left:2px solid #E8C879;border-radius:2px;margin-top:4px;margin-left:14px}
   .done-mark{color:#4A6741;font-weight:600;margin-left:8px}
   .week-tbl td.block{padding:5px;font-size:9px}
   .week-tbl td.block.clase{background:#0a0a0a;color:#fff}
@@ -2018,7 +2369,7 @@ function renderSidebar(){
   }).join('');
   const empty = STATE.subjects.length === 0 ?
     `<div style="padding:8px 13px;font-size:10px;color:var(--g400);line-height:1.5">
-      pídele a la ia que añada tus asignaturas →
+      pídele a la ia que añada tus asignaturas, o usa el botón <strong>+</strong> de arriba.
     </div>` : '';
   document.getElementById('subjects-list').innerHTML = all + items + empty;
   renderSubjPicker();
@@ -2026,11 +2377,118 @@ function renderSidebar(){
 }
 
 function setSubjFilter(id){
-  selectedSubjId = id;
+  // If already filtered by this subject, clicking again removes the filter
+  if(selectedSubjId === id) selectedSubjId = null;
+  else selectedSubjId = id;
   renderSidebar();
   renderDeadline();
   startCountdown();
   renderActiveView();
+}
+
+// ═══════════════════════════════════════════
+// SUBJECT CRUD (create, edit, delete manually)
+// ═══════════════════════════════════════════
+let editingSubjectId = null;
+let pendingSubjectColor = null;
+
+function openSubjectCreate(){
+  editingSubjectId = null;
+  pendingSubjectColor = SUBJECT_COLORS[STATE.subjects.length % SUBJECT_COLORS.length];
+  document.getElementById('subject-modal-title').textContent = 'nueva asignatura';
+  document.getElementById('subj-name').value = '';
+  document.getElementById('subj-hours').value = '';
+  document.getElementById('subj-delete').style.display = 'none';
+  renderColorSwatches();
+  document.getElementById('modal-subject').classList.add('open');
+  setTimeout(() => document.getElementById('subj-name').focus(), 100);
+}
+
+function openSubjectEdit(id){
+  const sub = getSub(id);
+  if(!sub) return;
+  editingSubjectId = id;
+  pendingSubjectColor = sub.color;
+  document.getElementById('subject-modal-title').textContent = 'editar asignatura';
+  document.getElementById('subj-name').value = sub.name;
+  document.getElementById('subj-hours').value = sub.weeklyHours || '';
+  document.getElementById('subj-delete').style.display = 'block';
+  renderColorSwatches();
+  document.getElementById('modal-subject').classList.add('open');
+}
+
+function renderColorSwatches(){
+  const grid = document.getElementById('subj-colors');
+  grid.innerHTML = SUBJECT_COLORS.map(c =>
+    `<div class="color-swatch ${c===pendingSubjectColor?'selected':''}"
+      style="background:${c}" onclick="pickSubjectColor('${c}')" title="${c}"></div>`
+  ).join('');
+}
+
+function pickSubjectColor(c){
+  pendingSubjectColor = c;
+  renderColorSwatches();
+}
+
+function saveSubject(){
+  const name = document.getElementById('subj-name').value.trim();
+  const hours = parseInt(document.getElementById('subj-hours').value) || 0;
+  if(!name){ showToast('falta el nombre'); return; }
+
+  if(editingSubjectId){
+    const sub = getSub(editingSubjectId);
+    if(sub){
+      sub.name = name;
+      sub.weeklyHours = hours;
+      sub.color = pendingSubjectColor;
+    }
+    showToast('asignatura actualizada');
+  } else {
+    // Generate id from name (lowercase, no accents, underscores)
+    let id = name.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    // Avoid collision
+    if(getSub(id)){
+      let i = 2;
+      while(getSub(`${id}_${i}`)) i++;
+      id = `${id}_${i}`;
+    }
+    if(STATE.subjects.length >= 10){
+      showToast('máximo 10 asignaturas');
+      return;
+    }
+    STATE.subjects.push({
+      id, name, color: pendingSubjectColor,
+      progress: 0, weeklyHours: hours, weeklyTracked: 0
+    });
+    showToast(`✓ ${name} añadida`);
+  }
+  saveState();
+  closeModalForce('modal-subject');
+  renderAll();
+}
+
+function deleteCurrentSubject(){
+  if(!editingSubjectId) return;
+  const sub = getSub(editingSubjectId);
+  if(!sub) return;
+  // Count what would be affected
+  const eventsCount = STATE.events.filter(e => e.subj === editingSubjectId).length;
+  const scheduleCount = STATE.schedule.filter(s => s.subj === editingSubjectId).length;
+  const total = eventsCount + scheduleCount;
+  const message = total > 0
+    ? `eliminar "${sub.name}"? esto desvinculará ${eventsCount} eventos y ${scheduleCount} bloques de horario (no se borran, quedan sin asignatura).`
+    : `eliminar "${sub.name}"?`;
+  if(!confirm(message)) return;
+
+  // Remove subject; events/schedule keep their old subj id (will be auto-handled by populateSubjectSelect)
+  STATE.subjects = STATE.subjects.filter(s => s.id !== editingSubjectId);
+  if(selectedSubjId === editingSubjectId) selectedSubjId = null;
+  saveState();
+  closeModalForce('modal-subject');
+  renderAll();
+  showToast('asignatura eliminada');
 }
 
 // ═══════════════════════════════════════════
@@ -2237,6 +2695,13 @@ function openSubjectDetail(id){
 function closeSubjectDetail(){
   document.getElementById('subj-detail-overlay').classList.remove('open');
   currentSubjectDetail = null;
+}
+
+function editSubjectFromDetail(){
+  const id = currentSubjectDetail;
+  if(!id) return;
+  closeSubjectDetail();
+  setTimeout(() => openSubjectEdit(id), 200);
 }
 
 function renderTrackedList(){
@@ -3323,6 +3788,7 @@ function addEventOnDay(dateStr){
   populateSubjectSelect('ev-subj');
   renderEventLinks();
   document.getElementById('ev-delete').style.display = 'none';
+  document.getElementById('ev-duplicate').style.display = 'none';
   document.getElementById('ev-link-add').style.display = 'none';
   document.getElementById('modal-event').classList.add('open');
   setTimeout(() => document.getElementById('ev-title').focus(), 100);
@@ -3342,6 +3808,7 @@ function editEvent(idx){
   populateSubjectSelect('ev-subj', ev.subj);
   renderEventLinks();
   document.getElementById('ev-delete').style.display = 'block';
+  document.getElementById('ev-duplicate').style.display = 'block';
   document.getElementById('ev-link-add').style.display = 'none';
   document.getElementById('modal-event').classList.add('open');
 }
@@ -3490,6 +3957,31 @@ function deleteCurrentEvent(){
   closeModalForce('modal-event');
   renderAll();
   showToast('evento eliminado');
+}
+
+function duplicateCurrentEvent(){
+  if(editingEventIdx === null) return;
+  const original = STATE.events[editingEventIdx];
+  if(!original) return;
+  // Compute next week's date for the duplicated event
+  const origDate = new Date(original.date);
+  origDate.setDate(origDate.getDate() + 7);
+  const newDate = origDate.toISOString().split('T')[0];
+  const copy = {
+    ...original,
+    date: newDate,
+    done: false,
+    links: [...(original.links || [])]
+  };
+  STATE.events.push(copy);
+  // Switch the modal to edit the new copy
+  editingEventIdx = STATE.events.length - 1;
+  pendingLinks = [...(copy.links || [])];
+  document.getElementById('event-modal-title').textContent = 'editar evento (duplicado)';
+  document.getElementById('ev-date').value = newDate;
+  saveState();
+  renderAll();
+  showToast('duplicado · ajusta la fecha si necesitas');
 }
 
 // ═══════════════════════════════════════════
@@ -3752,6 +4244,19 @@ CAPACIDADES:
 4. generar un plan de trabajo con sesiones de estudio, fases y pasos concretos
 5. responder preguntas sobre planificación
 
+⚠️ REGLA CRÍTICA — VINCULACIÓN DE ASIGNATURAS:
+todo evento, bloque de horario o sesión de plan DEBE vincularse a un id de asignatura existente. si el estudiante menciona una asignatura que no existe en el contexto actual:
+1. PRIMERO crea la asignatura en el array "subjects" (con id sin acentos ni espacios, ej: "fisica_2", "fisica_ii", "estructuras_3")
+2. DESPUÉS crea events/schedule/weekly_plan referenciando ese mismo id
+3. el id debe ser exactamente el mismo en todos los arrays (no varíes "fisica_ii" vs "fisicaII")
+
+NUNCA dejes eventos o tareas sin asignatura. NUNCA uses "otra" o "general" como id, siempre crea la asignatura específica.
+
+⚠️ REGLA CRÍTICA — PLAN DE TRABAJO VISIBLE:
+cuando crees un weekly_plan con sessions, también DEBES crear entradas correspondientes en "schedule" para que las sesiones de estudio aparezcan en la vista semanal. ejemplo:
+si el plan dice "sesión de física 2h el martes", añade también un schedule:
+{"day":1,"subj":"fisica_2","startH":18,"endH":20,"type":"estudio","title":"física 2 · estudio"}
+
 PARA CAMBIOS GRANDES (más de 3 modificaciones, o reorganización del plan):
 primero responde con una propuesta breve en lenguaje natural ("voy a hacer X, Y, Z. ¿lo aplico?") sin json. el estudiante confirmará.
 
@@ -3765,8 +4270,16 @@ responde con json dentro de bloques \`\`\`json ... \`\`\`:
   "summary": "resumen breve"
 }
 
+ORDEN DE LOS ARRAYS EN EL JSON:
+1. subjects (siempre primero, crea asignaturas nuevas si hace falta)
+2. events
+3. schedule (incluye clases reales + sesiones de estudio del plan)
+4. weekly_plan (al final, refleja lo que ya está en schedule)
+
+EL CAMPO 'subject' DEL EVENTO es CASE-SENSITIVE: usa el id exacto que tienes en subjects.
+
 COLORES disponibles para nuevas asignaturas: ${SUBJECT_COLORS.join(', ')}
-day en schedule: 0=lunes ... 6=domingo
+day en schedule: 0=lunes, 1=martes, 2=miércoles, 3=jueves, 4=viernes, 5=sábado, 6=domingo
 
 PASOS CONCRETOS según tipo de tarea:
 - proyecto de diseño: investigación → conceptos → planos → constructivo → maqueta → láminas
@@ -3774,6 +4287,7 @@ PASOS CONCRETOS según tipo de tarea:
 - maqueta: escala y material → corte → ensamblaje → acabados → fotografía
 - ensayo/análisis: fuentes → síntesis → estructura → redacción → corrección
 - examen: repaso apuntes → ejercicios tipo → casos prácticos → repaso final
+- entrega física/matemáticas: repaso teoría → ejercicios resueltos → problemas tipo examen
 
 CRITERIOS DEL PLAN:
 - máximo 6h efectivas al día
@@ -3781,6 +4295,7 @@ CRITERIOS DEL PLAN:
 - intensificar 2 semanas antes de entregas/exámenes
 - alternar asignaturas para evitar saturación
 - arquitectura necesita reflexión, no solo producción
+- las horas de estudio en schedule deben ser realistas (ej. 18-20h, 20-22h en días laborables; 10-12h, 16-18h en fin de semana)
 
 todo en minúsculas, tono cercano, español. respuestas breves y concretas (máximo 4 frases si no hay json).`;
 }
@@ -3801,6 +4316,7 @@ async function sendMsg(){
   if(!txt && !hasFiles) return;
   inp.value = '';
   inp.style.height = 'auto';
+  openIaCmd();
 
   const blocks = [];
   pendingFiles.forEach(f => {
@@ -3997,6 +4513,17 @@ function importAIPlan(txt){
     if(data.events && Array.isArray(data.events)){
       data.events.forEach(ev => {
         const subj = ev.subject || ev.subj || 'otra';
+        // If the event references a subject that doesn't exist yet, auto-create it
+        // (best-effort: derive a friendly name from the id)
+        if(subj !== 'otra' && !getSub(subj)){
+          const friendlyName = subj.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).toLowerCase();
+          const color = SUBJECT_COLORS[STATE.subjects.length % SUBJECT_COLORS.length];
+          STATE.subjects.push({
+            id: subj, name: friendlyName, color,
+            progress: 0, weeklyHours: 0, weeklyTracked: 0
+          });
+          logChange('add', `nueva asignatura inferida: ${friendlyName}`);
+        }
         const sub = getSub(subj);
         const subName = sub ? sub.name : subj;
         if(ev.action === 'delete'){
@@ -4030,6 +4557,19 @@ function importAIPlan(txt){
     }
 
     if(data.schedule && Array.isArray(data.schedule)){
+      // Auto-create any missing subjects referenced in the schedule
+      data.schedule.forEach(s => {
+        const subj = s.subj || s.subject;
+        if(subj && subj !== 'otra' && !getSub(subj)){
+          const friendlyName = subj.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).toLowerCase();
+          const color = SUBJECT_COLORS[STATE.subjects.length % SUBJECT_COLORS.length];
+          STATE.subjects.push({
+            id: subj, name: friendlyName, color,
+            progress: 0, weeklyHours: 0, weeklyTracked: 0
+          });
+          logChange('add', `nueva asignatura inferida: ${friendlyName}`);
+        }
+      });
       // Preserve manual notes, links, and done state when IA replaces schedule
       const oldSchedule = STATE.schedule || [];
       STATE.schedule = data.schedule.map(s => {
@@ -4053,6 +4593,63 @@ function importAIPlan(txt){
         stepDone: STATE.weeklyPlan?.stepDone || {}
       };
       logChange('update', `plan de trabajo regenerado`);
+
+      // Auto-sync: if the IA didn't create schedule entries for plan sessions,
+      // generate them automatically so they appear in the week view.
+      if(data.weekly_plan && Array.isArray(data.weekly_plan)){
+        let added = 0;
+        // Group sessions by subject across all weeks to get a typical pattern
+        const sessionsBySubj = {};
+        data.weekly_plan.forEach(w => {
+          (w.sessions || []).forEach(s => {
+            const id = s.subject || s.subj;
+            if(!id) return;
+            if(!sessionsBySubj[id]) sessionsBySubj[id] = [];
+            sessionsBySubj[id].push(s);
+          });
+        });
+        // For each subject's plan, ensure at least one schedule entry exists
+        Object.entries(sessionsBySubj).forEach(([subjId, sessions]) => {
+          const sub = getSub(subjId);
+          if(!sub) return;
+          const hasScheduleStudy = STATE.schedule.some(b =>
+            b.subj === subjId && (b.type === 'estudio' || b.type === 'tarea')
+          );
+          if(hasScheduleStudy) return;
+          // Pick representative weekly hours (avg) and generate blocks
+          const avgHours = Math.round(sessions.reduce((acc,s) => acc + (s.hours||2), 0) / sessions.length) || 2;
+          // Distribute across weekdays starting at 18h
+          const slots = [
+            {day:1, startH:18}, {day:3, startH:18}, {day:5, startH:10}
+          ];
+          let remaining = Math.min(avgHours, 6);
+          for(const slot of slots){
+            if(remaining <= 0) break;
+            const blockHours = Math.min(remaining, 2);
+            // Skip if already overlapping
+            const overlap = STATE.schedule.some(b =>
+              b.day === slot.day && b.startH < slot.startH + blockHours && b.endH > slot.startH
+            );
+            if(overlap) continue;
+            STATE.schedule.push({
+              day: slot.day,
+              startH: slot.startH,
+              endH: slot.startH + blockHours,
+              type: 'estudio',
+              subj: subjId,
+              title: `${sub.name} · estudio`,
+              done: false,
+              notes: '',
+              links: []
+            });
+            remaining -= blockHours;
+            added++;
+          }
+        });
+        if(added > 0){
+          logChange('add', `${added} sesiones de estudio añadidas al horario`);
+        }
+      }
     }
 
     return true;
@@ -4084,19 +4681,40 @@ function initIaWelcome(){
 }
 
 // ═══════════════════════════════════════════
-// IA PANEL TOGGLE
+// IA COMMAND BAR TOGGLE
 // ═══════════════════════════════════════════
-function toggleIaPanel(){
-  const p = document.getElementById('ia-panel');
-  p.classList.toggle('collapsed');
-  STATE.iaCollapsed = p.classList.contains('collapsed');
-  saveState();
+function openIaCmd(){
+  document.getElementById('ia-cmd').classList.add('open');
+  // Scroll messages to bottom
+  setTimeout(() => {
+    const m = document.getElementById('ia-msgs');
+    if(m) m.scrollTop = m.scrollHeight;
+  }, 50);
 }
 
-function toggleIaMobile(){
-  const p = document.getElementById('ia-panel');
-  p.classList.toggle('open-mobile');
+function closeIaCmd(){
+  document.getElementById('ia-cmd').classList.remove('open');
+  document.getElementById('ia-input').blur();
 }
+
+function toggleIaCmd(){
+  const p = document.getElementById('ia-cmd');
+  if(p.classList.contains('open')) closeIaCmd();
+  else openIaCmd();
+}
+
+// Backwards compatibility (shouldn't be called)
+function toggleIaPanel(){ toggleIaCmd(); }
+function toggleIaMobile(){ openIaCmd(); document.getElementById('ia-input').focus(); }
+
+// Close on Escape when input is focused
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && document.getElementById('ia-cmd').classList.contains('open')){
+    if(document.activeElement === document.getElementById('ia-input')){
+      closeIaCmd();
+    }
+  }
+});
 
 // ═══════════════════════════════════════════
 // MOBILE TOGGLES
@@ -4120,7 +4738,6 @@ function toggleRight(){
 function closeSidebars(){
   document.querySelector('.sidebar').classList.remove('open');
   document.querySelector('.focus-panel').classList.remove('open');
-  document.querySelector('.ia-panel').classList.remove('open-mobile');
   document.getElementById('sb-overlay').classList.remove('show');
 }
 
@@ -4289,6 +4906,225 @@ if(window.matchMedia){
 }
 
 // ═══════════════════════════════════════════
+// AMBIENT MODE — modo concentración con video lofi
+// ═══════════════════════════════════════════
+const AMBIENT_VIDEO = 'ambient/lofi.mp4';
+const AMBIENT_POSTER = 'ambient/lofi-poster.jpg';
+let ambientOn = false;
+let activeAmbientView = null;
+let ambientVideoLoaded = false;
+
+function toggleAmbient(){
+  if(ambientOn) exitAmbient();
+  else enterAmbient();
+}
+
+function enterAmbient(){
+  ambientOn = true;
+  document.body.classList.add('ambient-on');
+
+  // Lazy-load the video on first activation
+  const video = document.getElementById('ambient-video');
+  if(!ambientVideoLoaded){
+    const isReducedMotion = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(!isReducedMotion){
+      video.poster = AMBIENT_POSTER;
+      // Add source dynamically so it only loads when ambient activates
+      const source = document.createElement('source');
+      source.src = AMBIENT_VIDEO;
+      source.type = 'video/mp4';
+      video.appendChild(source);
+      video.load();
+      // Handle missing video file gracefully
+      video.addEventListener('error', () => {
+        document.getElementById('ambient-bg').classList.add('no-video');
+      }, {once:true});
+      // Try to play (browsers require muted+inline, which we have)
+      video.play().catch(err => {
+        console.warn('Video autoplay blocked:', err);
+      });
+    } else {
+      // Reduce motion: just show poster as background
+      document.getElementById('ambient-bg').classList.add('no-video');
+    }
+    ambientVideoLoaded = true;
+  } else {
+    video.play().catch(()=>{});
+  }
+
+  // Render the ambient widgets with current data
+  renderAmbient();
+  showToast('modo ambiente · esc para salir');
+}
+
+function exitAmbient(){
+  ambientOn = false;
+  document.body.classList.remove('ambient-on');
+  document.body.classList.remove('spotlight-on');
+  activeAmbientView = null;
+  // Pause video to save resources
+  const video = document.getElementById('ambient-video');
+  if(video) video.pause();
+  // Restore main view to its proper container
+  restoreMainFromSpotlight();
+}
+
+// When user clicks a nav pill in ambient mode, show that view in the spotlight
+function ambientView(view){
+  if(!ambientOn) return;
+  if(view === null || view === activeAmbientView){
+    // close spotlight
+    document.body.classList.remove('spotlight-on');
+    activeAmbientView = null;
+    document.getElementById('aw-close-view').style.display = 'none';
+    document.querySelectorAll('.aw-nav-pill').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.spotlight-tab').forEach(t => t.classList.remove('active'));
+    restoreMainFromSpotlight();
+    return;
+  }
+
+  activeAmbientView = view;
+  document.body.classList.add('spotlight-on');
+  document.getElementById('aw-close-view').style.display = 'block';
+
+  // Mark active pill
+  document.querySelectorAll('.aw-nav-pill').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.spotlight-tab').forEach(t => t.classList.remove('active'));
+  const pillBtns = document.querySelectorAll('.aw-nav-pill');
+  const map = {hoy:0, week:1, month:2, gantt:3};
+  if(pillBtns[map[view]]) pillBtns[map[view]].classList.add('active');
+  document.querySelectorAll('.spotlight-tab').forEach(t => {
+    if(t.dataset.view === view) t.classList.add('active');
+  });
+
+  // Move the .main element into the spotlight body and activate the right view
+  const main = document.querySelector('.main');
+  const spotlightBody = document.getElementById('spotlight-body');
+  if(main && main.parentNode !== spotlightBody){
+    spotlightBody.appendChild(main);
+  }
+
+  // Activate the requested view
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  const targetView = document.getElementById(`view-${view}`);
+  if(targetView) targetView.classList.add('active');
+  // Mark the corresponding original tab as active too (for when user exits ambient)
+  const tabIdx = {hoy:0, week:1, month:2, gantt:3}[view];
+  const allTabs = document.querySelectorAll('nav.tabs .tab');
+  if(allTabs[tabIdx]) allTabs[tabIdx].classList.add('active');
+
+  renderActiveView();
+}
+
+// Restore .main to its original parent (.body) when exiting ambient or closing spotlight
+function restoreMainFromSpotlight(){
+  const main = document.querySelector('.main');
+  const body = document.querySelector('.body');
+  if(main && body && main.parentNode !== body){
+    // Insert before .focus-panel (which is right after .main in original layout)
+    const focusPanel = body.querySelector('.focus-panel');
+    if(focusPanel) body.insertBefore(main, focusPanel);
+    else body.appendChild(main);
+  }
+}
+
+// Render the corner widgets (clock, countdown, timer) in ambient mode
+function renderAmbient(){
+  if(!ambientOn) return;
+
+  // Clock
+  const n = new Date();
+  const h = String(n.getHours()).padStart(2,'0');
+  const m = String(n.getMinutes()).padStart(2,'0');
+  const clock = document.getElementById('aw-clock-time');
+  const clockDate = document.getElementById('aw-clock-date');
+  if(clock) clock.textContent = `${h}:${m}`;
+  if(clockDate) clockDate.textContent = `${DAYS_ES[n.getDay()]} ${n.getDate()} ${MONTHS_ES[n.getMonth()]}`;
+
+  // Countdown
+  const today = new Date(); today.setHours(0,0,0,0);
+  const evs = STATE.events
+    .filter(e => !e.done && new Date(e.date) >= today)
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+  const cdBig = document.getElementById('aw-cd-big');
+  const cdTitle = document.getElementById('aw-cd-title');
+  const cdSub = document.getElementById('aw-cd-sub');
+  if(evs.length){
+    const ev = evs[0];
+    const sub = getSub(ev.subj);
+    const ms = new Date(ev.date).setHours(23,59,59) - Date.now();
+    const d = Math.floor(ms/864e5);
+    const hh = Math.floor((ms%864e5)/3600000);
+    const mm = Math.floor((ms%3600000)/60000);
+    let bigText = '';
+    if(d >= 1) bigText = d === 1 ? 'mañana' : `${d} días`;
+    else bigText = `${String(hh).padStart(2,'0')}h ${String(mm).padStart(2,'0')}m`;
+    cdBig.textContent = bigText;
+    cdBig.classList.toggle('urgent', ms < 48*3600*1000);
+    cdTitle.textContent = ev.title;
+    cdSub.textContent = sub ? sub.name : '';
+  } else {
+    cdBig.textContent = '—';
+    cdTitle.textContent = 'sin entregas pendientes';
+    cdSub.textContent = '';
+    cdBig.classList.remove('urgent');
+  }
+
+  // Timer (mirror from main timer state)
+  const tm = String(Math.floor(timerLeft/60)).padStart(2,'0');
+  const ts = String(timerLeft%60).padStart(2,'0');
+  const td = document.getElementById('aw-timer-display');
+  if(td) td.textContent = `${tm}:${ts}`;
+  const tb = document.getElementById('aw-timer-btn');
+  if(tb) tb.textContent = timerRunning ? 'pausar' : (timerLeft < TIMER_TIMES[timerMode] ? 'continuar' : 'iniciar');
+
+  // Session button mirror
+  const sb = document.getElementById('aw-session-btn');
+  if(sb){
+    if(sessionRunning){
+      const sub = getSub(sessionSubjId);
+      const mm = Math.floor(sessionElapsed/60), ss = sessionElapsed%60;
+      sb.textContent = `⬤ ${sub?.name || 'sesión'} — ${mm}m ${String(ss).padStart(2,'0')}s`;
+      sb.classList.add('running');
+    } else {
+      sb.textContent = 'iniciar sesión';
+      sb.classList.remove('running');
+    }
+  }
+}
+
+// Update ambient widgets every second when active
+setInterval(() => { if(ambientOn) renderAmbient(); }, 1000);
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  // Cmd/Ctrl + Shift + L → toggle ambient
+  if((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'l'){
+    e.preventDefault();
+    toggleAmbient();
+  }
+  // Escape → close spotlight first, then exit ambient
+  if(e.key === 'Escape' && ambientOn){
+    // Don't interfere if a modal is open or the user is typing in a textarea/input
+    const activeModal = document.querySelector('.modal-overlay.open');
+    if(activeModal) return;
+    const activeEl = document.activeElement;
+    if(activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')){
+      // Let escape blur the input first, but only if it's the IA cmd bar
+      if(activeEl.id === 'ia-input') return;
+    }
+    if(activeAmbientView){
+      ambientView(null);
+    } else {
+      exitAmbient();
+    }
+    e.preventDefault();
+  }
+});
+
+// ═══════════════════════════════════════════
 // MUSIC PLAYER
 // ═══════════════════════════════════════════
 function toggleMusic(){
@@ -4421,7 +5257,8 @@ loadState();
 // Apply theme
 applyTheme(STATE.theme || 'auto');
 
-if(STATE.iaCollapsed) document.getElementById('ia-panel').classList.add('collapsed');
+// State no longer uses iaCollapsed for the panel (now command bar)
+// but kept for backwards compat
 renderAll();
 initIaWelcome();
 renderMusic();
