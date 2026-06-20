@@ -250,6 +250,46 @@ header{border-bottom:1px solid var(--g200);padding:12px 22px;
 .subj-detail-section-lbl{font-size:8px;letter-spacing:2px;color:var(--g400);margin-bottom:10px;
   display:flex;align-items:center;justify-content:space-between}
 .subj-detail-empty{font-size:10px;color:var(--g400);font-style:italic;padding:4px 0}
+
+/* grades section */
+.grade-target-row{display:flex;align-items:center;gap:10px;padding:8px 11px;margin-bottom:10px;
+  background:var(--g100);border-radius:6px}
+.grade-target-lbl{font-size:10px;letter-spacing:1px;color:var(--g600);text-transform:lowercase}
+.grade-target-input{width:56px;padding:4px 8px;border:1px solid var(--g300);border-radius:5px;
+  font-family:'Inter',sans-serif;font-size:12px;font-weight:600;text-align:center;background:var(--white);
+  color:var(--black);outline:none;font-variant-numeric:tabular-nums;transition:border-color .15s}
+.grade-target-input:focus{border-color:var(--black)}
+.grade-target-default{font-size:9px;color:var(--g400);font-style:italic;letter-spacing:.3px}
+html.dark .grade-target-input{background:var(--g200);border-color:var(--g300)}
+.grade-list{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.grade-item{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--g100);
+  border-radius:6px;cursor:pointer;transition:background .15s}
+.grade-item:hover{background:var(--g200)}
+.grade-item-name{flex:1;font-size:11px;color:var(--g800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grade-item-weight{font-size:9px;color:var(--g400);letter-spacing:.5px;flex-shrink:0;
+  min-width:32px;text-align:right}
+.grade-item-score{font-size:13px;font-weight:600;flex-shrink:0;min-width:32px;text-align:right;
+  font-variant-numeric:tabular-nums}
+.grade-item-score.pass{color:#3D6B4F}
+.grade-item-score.fail{color:#9B3D3D}
+html.dark .grade-item-score.pass{color:#6FA683}
+html.dark .grade-item-score.fail{color:#D98585}
+.grade-summary{font-size:11px;color:var(--g800);line-height:1.6;padding:8px 0 0 0;
+  border-top:1px solid var(--g200)}
+.grade-summary strong{color:var(--black);font-weight:600}
+.grade-muted{color:var(--g400);font-size:9.5px}
+.grade-prediction{margin-top:8px;padding:9px 11px;border-radius:6px;font-size:11px;line-height:1.55;
+  background:#FFF8E1;border-left:2px solid #E8C879;color:#7A5E1A}
+.grade-prediction strong{font-weight:700}
+.grade-prediction.secondary{background:var(--g100);border-left-color:var(--g300);color:var(--g800);margin-top:5px}
+.grade-prediction.pass{background:#E8F3EC;border-left-color:#5C9678;color:#2D5A42}
+.grade-prediction.fail{background:#F5E8E8;border-left-color:#C17A7A;color:#7A3D3D}
+html.dark .grade-prediction{background:rgba(232,200,121,.12);color:#D4B876}
+html.dark .grade-prediction.secondary{background:var(--g100);color:var(--g800)}
+html.dark .grade-prediction.pass{background:rgba(92,150,120,.15);color:#7FB896}
+html.dark .grade-prediction.fail{background:rgba(193,122,122,.15);color:#D49595}
+.grade-hint-info{margin-top:6px;padding:8px 11px;background:var(--g100);border-radius:6px;
+  font-size:10px;color:var(--g600);line-height:1.5;font-style:italic}
 .subj-detail-evlist{display:flex;flex-direction:column;gap:5px}
 .subj-detail-ev{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--g200);
   border-radius:6px;cursor:pointer;transition:all .15s}
@@ -800,6 +840,9 @@ html.dark .modal-btn.danger:hover{background:#2a1a1a}
   display:flex;align-items:center;justify-content:space-between}
 .event-section-lbl button{font-size:9px;letter-spacing:.5px;color:var(--g400);
   background:none;border:none;cursor:pointer;font-family:inherit;padding:0;text-transform:none}
+.ev-grade-hint{margin-top:10px;padding:8px 11px;background:var(--g100);border-radius:6px;
+  font-size:10.5px;line-height:1.5;color:var(--g800)}
+.ev-grade-hint strong{color:var(--black)}
 .event-section-lbl button:hover{color:var(--black)}
 
 /* link items */
@@ -1463,7 +1506,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
           </div>
           <div class="modal-field" style="flex:1">
             <label class="modal-field-lbl">tipo</label>
-            <select class="modal-select" id="ev-type">
+            <select class="modal-select" id="ev-type" onchange="updateGradeSectionVisibility()">
               <option value="entrega">entrega</option>
               <option value="examen">examen</option>
               <option value="clase">clase</option>
@@ -1481,6 +1524,25 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
         <div class="event-section-lbl">notas</div>
         <textarea class="event-notes-area" id="ev-notes"
           placeholder="anotaciones, tareas pendientes, referencias..."></textarea>
+      </div>
+
+      <!-- Grade section (only meaningful for entrega/examen) -->
+      <div class="event-section" id="ev-grade-section">
+        <div class="event-section-lbl">
+          <span>calificación</span>
+          <span style="font-size:8px;color:var(--g400);letter-spacing:.5px;font-weight:400">rellena cuando tengas la nota</span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <div class="modal-field" style="flex:1;margin-bottom:0">
+            <label class="modal-field-lbl">nota (0-10)</label>
+            <input class="modal-input" type="number" id="ev-grade" min="0" max="10" step="0.05" placeholder="—" oninput="updateGradeHint()"/>
+          </div>
+          <div class="modal-field" style="flex:1;margin-bottom:0">
+            <label class="modal-field-lbl">peso (%)</label>
+            <input class="modal-input" type="number" id="ev-weight" min="0" max="100" step="1" placeholder="—"/>
+          </div>
+        </div>
+        <div class="ev-grade-hint" id="ev-grade-hint" style="display:none"></div>
       </div>
 
       <!-- Links section -->
@@ -1669,9 +1731,15 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
         <label class="modal-field-lbl">color</label>
         <div class="color-grid" id="subj-colors"></div>
       </div>
-      <div class="modal-field" style="margin-bottom:0">
-        <label class="modal-field-lbl">horas semanales (opcional)</label>
-        <input class="modal-input" type="number" id="subj-hours" min="0" max="40" step="1" placeholder="6"/>
+      <div style="display:flex;gap:10px">
+        <div class="modal-field" style="flex:1;margin-bottom:0">
+          <label class="modal-field-lbl">horas semanales (opcional)</label>
+          <input class="modal-input" type="number" id="subj-hours" min="0" max="40" step="1" placeholder="6"/>
+        </div>
+        <div class="modal-field" style="flex:1;margin-bottom:0">
+          <label class="modal-field-lbl">nota objetivo (0-10)</label>
+          <input class="modal-input" type="number" id="subj-target" min="0" max="10" step="0.5" placeholder="5"/>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -2359,6 +2427,122 @@ function resetAll(){
 // UTILITIES
 // ═══════════════════════════════════════════
 function getSub(id){ return STATE.subjects.find(s => s.id === id); }
+
+// ═══════════════════════════════════════════
+// GRADES — weighted average + prediction per subject
+// ═══════════════════════════════════════════
+
+// Returns all graded events for a subject (those with a numeric grade)
+function getGradedEvents(subjId){
+  return STATE.events.filter(e =>
+    e.subj === subjId &&
+    e.type !== 'clase' &&
+    e.grade !== undefined && e.grade !== null && !isNaN(e.grade)
+  );
+}
+
+// Returns all evaluable events for a subject (entregas/exámenes, graded or not)
+function getEvaluableEvents(subjId){
+  return STATE.events.filter(e =>
+    e.subj === subjId && e.type !== 'clase'
+  );
+}
+
+// Compute weighted average for a subject.
+// Returns {average, gradedWeight, totalWeight, hasWeights, gradedCount, pendingCount, ...}
+function computeSubjectGrade(subjId){
+  const evaluable = getEvaluableEvents(subjId);
+  const graded = getGradedEvents(subjId);
+
+  if(evaluable.length === 0){
+    return {hasData:false};
+  }
+
+  // Determine if weights are defined
+  const withWeight = evaluable.filter(e => e.weight !== undefined && e.weight !== null && !isNaN(e.weight) && e.weight > 0);
+  const hasWeights = withWeight.length > 0;
+
+  let average = null, gradedWeightSum = 0, totalWeightSum = 0, currentContribution = 0;
+
+  if(hasWeights){
+    // Weighted average based on defined weights
+    evaluable.forEach(e => {
+      const w = (e.weight !== undefined && e.weight !== null && !isNaN(e.weight)) ? e.weight : 0;
+      totalWeightSum += w;
+      if(e.grade !== undefined && e.grade !== null && !isNaN(e.grade)){
+        gradedWeightSum += w;
+        currentContribution += e.grade * w;
+      }
+    });
+    // Average of graded portion (over the graded weight)
+    average = gradedWeightSum > 0 ? (currentContribution / gradedWeightSum) : null;
+  } else {
+    // Simple average of graded items (equal weight)
+    if(graded.length > 0){
+      average = graded.reduce((acc, e) => acc + e.grade, 0) / graded.length;
+    }
+  }
+
+  return {
+    hasData: true,
+    hasWeights,
+    average,                          // average over graded items (0-10)
+    gradedCount: graded.length,
+    pendingCount: evaluable.length - graded.length,
+    evaluableCount: evaluable.length,
+    gradedWeightSum,                  // sum of weights already graded (%)
+    totalWeightSum,                   // sum of all defined weights (%)
+    currentContribution,              // sum of grade*weight for graded items
+    // Final grade so far, assuming current contribution counts toward 100%
+    accumulatedFinal: hasWeights ? (currentContribution / 100) : null
+  };
+}
+
+// Predict what average grade is needed in remaining (ungraded) evaluable items
+// to reach a target final grade (default 5 = pass).
+// Get the target grade for a subject (defaults to 5 if not set)
+function getTargetGrade(subjId){
+  const sub = getSub(subjId);
+  if(sub && sub.targetGrade !== undefined && sub.targetGrade !== null && !isNaN(sub.targetGrade)){
+    return sub.targetGrade;
+  }
+  return 5; // default: pass
+}
+
+// Set target grade inline from the ficha
+function setSubjectTarget(subjId, value){
+  const sub = getSub(subjId);
+  if(!sub) return;
+  if(value === '' || isNaN(parseFloat(value))){
+    sub.targetGrade = null;
+  } else {
+    sub.targetGrade = Math.min(10, Math.max(0, parseFloat(value)));
+  }
+  saveState();
+  // Re-render the detail panel to update the prediction
+  openSubjectDetail(subjId);
+}
+
+function predictNeededGrade(subjId, target = 5){
+  const g = computeSubjectGrade(subjId);
+  if(!g.hasData || !g.hasWeights) return null;
+
+  const remainingWeight = g.totalWeightSum - g.gradedWeightSum;
+  if(remainingWeight <= 0) return null; // nothing left to grade
+
+  // currentContribution is in grade*% units (e.g. 7 * 40 = 280)
+  // We want: (currentContribution + neededAvg * remainingWeight) / 100 >= target
+  // → neededAvg = (target*100 - currentContribution) / remainingWeight
+  const neededAvg = (target * 100 - g.currentContribution) / remainingWeight;
+
+  return {
+    neededAvg,                       // average grade needed in remaining items
+    remainingWeight,                 // % of grade still pending
+    achievable: neededAvg <= 10,     // is it even possible?
+    alreadySecured: neededAvg <= 0,  // already passed regardless of remaining
+    target
+  };
+}
 function filteredEvents(){
   return selectedSubjId ? STATE.events.filter(e => e.subj === selectedSubjId) : STATE.events;
 }
@@ -2439,6 +2623,7 @@ function openSubjectCreate(){
   document.getElementById('subject-modal-title').textContent = 'nueva asignatura';
   document.getElementById('subj-name').value = '';
   document.getElementById('subj-hours').value = '';
+  document.getElementById('subj-target').value = '';
   document.getElementById('subj-delete').style.display = 'none';
   renderColorSwatches();
   document.getElementById('modal-subject').classList.add('open');
@@ -2453,6 +2638,7 @@ function openSubjectEdit(id){
   document.getElementById('subject-modal-title').textContent = 'editar asignatura';
   document.getElementById('subj-name').value = sub.name;
   document.getElementById('subj-hours').value = sub.weeklyHours || '';
+  document.getElementById('subj-target').value = (sub.targetGrade !== undefined && sub.targetGrade !== null) ? sub.targetGrade : '';
   document.getElementById('subj-delete').style.display = 'block';
   renderColorSwatches();
   document.getElementById('modal-subject').classList.add('open');
@@ -2474,6 +2660,9 @@ function pickSubjectColor(c){
 function saveSubject(){
   const name = document.getElementById('subj-name').value.trim();
   const hours = parseInt(document.getElementById('subj-hours').value) || 0;
+  const targetRaw = document.getElementById('subj-target').value;
+  const targetGrade = (targetRaw !== '' && !isNaN(parseFloat(targetRaw)))
+    ? Math.min(10, Math.max(0, parseFloat(targetRaw))) : null;
   if(!name){ showToast('falta el nombre'); return; }
 
   if(editingSubjectId){
@@ -2482,6 +2671,7 @@ function saveSubject(){
       sub.name = name;
       sub.weeklyHours = hours;
       sub.color = pendingSubjectColor;
+      sub.targetGrade = targetGrade;
     }
     showToast('asignatura actualizada');
   } else {
@@ -2501,7 +2691,8 @@ function saveSubject(){
     }
     STATE.subjects.push({
       id, name, color: pendingSubjectColor,
-      progress: 0, weeklyHours: hours, weeklyTracked: 0
+      progress: 0, weeklyHours: hours, weeklyTracked: 0,
+      targetGrade
     });
     showToast(`✓ ${name} añadida`);
   }
@@ -2554,16 +2745,105 @@ function openSubjectDetail(id){
   const allLinks = allEvs.flatMap(e => e.links || []).length
                  + subjSchedules.flatMap(s => s.links || []).length;
 
+  const gradeInfo = computeSubjectGrade(id);
+  const avgStat = (gradeInfo.hasData && gradeInfo.average !== null)
+    ? `<div class="subj-detail-stat"><strong>${fmtGrade(gradeInfo.average)}</strong>nota media</div>`
+    : '';
+
   document.getElementById('subj-detail-stats').innerHTML = `
     <div class="subj-detail-stat"><strong>${sub.progress || 0}%</strong>completado</div>
     <div class="subj-detail-stat"><strong>${upcoming}</strong>pendientes</div>
     <div class="subj-detail-stat"><strong>${totalHours}h</strong>registradas</div>
+    ${avgStat}
     <div class="subj-detail-stat"><strong>${allLinks}</strong>enlaces</div>
   `;
 
   // Body sections
   let body = '';
   const today = new Date(); today.setHours(0,0,0,0);
+
+  // 0. GRADES — weighted average + prediction
+  if(gradeInfo.hasData){
+    const curTarget = getTargetGrade(id);
+    const hasCustomTarget = (() => { const s = getSub(id); return s && s.targetGrade !== undefined && s.targetGrade !== null; })();
+    body += `<div class="subj-detail-section">
+      <div class="subj-detail-section-lbl">
+        <span>calificaciones</span>
+      </div>
+      <div class="grade-target-row">
+        <span class="grade-target-lbl">nota objetivo</span>
+        <input class="grade-target-input" type="number" min="0" max="10" step="0.5"
+          value="${hasCustomTarget ? curTarget : ''}" placeholder="5"
+          onchange="setSubjectTarget('${id}', this.value)"
+          title="nota que quieres alcanzar en esta asignatura"/>
+        ${!hasCustomTarget ? '<span class="grade-target-default">por defecto: 5 (aprobado)</span>' : ''}
+      </div>`;
+
+    // List graded items
+    const gradedEvs = getGradedEvents(id).sort((a,b) => new Date(a.date) - new Date(b.date));
+    if(gradedEvs.length){
+      body += `<div class="grade-list">`;
+      gradedEvs.forEach(ev => {
+        const idx = STATE.events.indexOf(ev);
+        const wLabel = (ev.weight !== null && ev.weight !== undefined) ? `${ev.weight}%` : '—';
+        const gradeClass = ev.grade >= 5 ? 'pass' : 'fail';
+        body += `<div class="grade-item" onclick="closeSubjectDetail();setTimeout(()=>editEvent(${idx}),200)">
+          <div class="grade-item-name">${ev.title}</div>
+          <div class="grade-item-weight">${wLabel}</div>
+          <div class="grade-item-score ${gradeClass}">${fmtGrade(ev.grade)}</div>
+        </div>`;
+      });
+      body += `</div>`;
+    }
+
+    // Average + accumulated
+    if(gradeInfo.average !== null){
+      let avgLine = `media de lo calificado: <strong>${fmtGrade(gradeInfo.average)}</strong>`;
+      if(gradeInfo.hasWeights){
+        avgLine += ` · nota acumulada: <strong>${fmtGrade(gradeInfo.accumulatedFinal)}</strong> de 10`;
+        avgLine += ` <span class="grade-muted">(${gradeInfo.gradedWeightSum}% del total evaluado)</span>`;
+      }
+      body += `<div class="grade-summary">${avgLine}</div>`;
+    }
+
+    // Prediction — uses the subject's target grade (default 5)
+    if(gradeInfo.hasWeights && gradeInfo.pendingCount > 0){
+      const target = getTargetGrade(id);
+      const targetLabel = fmtGrade(target);
+      const isCustomTarget = (() => { const s = getSub(id); return s && s.targetGrade !== undefined && s.targetGrade !== null; })();
+      const targetWord = target >= 9 ? 'sobresaliente' : target >= 7 ? 'notable' : target >= 5 ? 'aprobado' : 'tu objetivo';
+      const pred = predictNeededGrade(id, target);
+      if(pred){
+        let predMsg = '';
+        const objTxt = isCustomTarget ? `tu objetivo (${targetLabel})` : 'aprobar';
+        if(pred.alreadySecured){
+          predMsg = `✓ <strong>${isCustomTarget ? targetLabel+' asegurado' : 'aprobado asegurado'}</strong> · ya lo tienes aunque saques 0 en lo que queda`;
+        } else if(!pred.achievable){
+          predMsg = `⚠ con lo que queda (${pred.remainingWeight}%) <strong>no es posible llegar a ${targetLabel}</strong>. necesitarías un ${fmtGrade(pred.neededAvg)} de media, por encima de 10`;
+        } else {
+          predMsg = `para ${objTxt} necesitas una media de <strong>${fmtGrade(pred.neededAvg)}</strong> en lo que queda (${pred.remainingWeight}% restante)`;
+        }
+        body += `<div class="grade-prediction">${predMsg}</div>`;
+
+        // If target is below notable, also show what's needed for notable (7) as a stretch goal
+        if(target < 7){
+          const pred7 = predictNeededGrade(id, 7);
+          if(pred7 && pred7.achievable && !pred7.alreadySecured){
+            body += `<div class="grade-prediction secondary">para un notable (7) necesitas <strong>${fmtGrade(pred7.neededAvg)}</strong></div>`;
+          }
+        }
+      }
+    } else if(gradeInfo.hasWeights && gradeInfo.pendingCount === 0 && gradeInfo.accumulatedFinal !== null){
+      // All graded — show final
+      const target = getTargetGrade(id);
+      const finalClass = gradeInfo.accumulatedFinal >= target ? 'pass' : 'fail';
+      body += `<div class="grade-prediction ${finalClass}">nota final de la asignatura: <strong>${fmtGrade(gradeInfo.accumulatedFinal)}</strong></div>`;
+    } else if(!gradeInfo.hasWeights){
+      body += `<div class="grade-hint-info">añade el peso (%) de cada examen o entrega para calcular la media ponderada y predecir qué necesitas para alcanzar tu objetivo</div>`;
+    }
+
+    body += `</div>`;
+  }
 
   // 1. UPCOMING EVENTS
   const upcomingEvs = allEvs.filter(e => !e.done && new Date(e.date) >= today)
@@ -3826,8 +4106,12 @@ function addEventOnDay(dateStr){
   document.getElementById('ev-date').value = dateStr;
   document.getElementById('ev-type').value = 'entrega';
   document.getElementById('ev-notes').value = '';
+  document.getElementById('ev-grade').value = '';
+  document.getElementById('ev-weight').value = '';
   populateSubjectSelect('ev-subj');
   renderEventLinks();
+  updateGradeSectionVisibility();
+  updateGradeHint();
   document.getElementById('ev-delete').style.display = 'none';
   document.getElementById('ev-duplicate').style.display = 'none';
   document.getElementById('ev-link-add').style.display = 'none';
@@ -3846,12 +4130,47 @@ function editEvent(idx){
   document.getElementById('ev-date').value = ev.date;
   document.getElementById('ev-type').value = ev.type || 'entrega';
   document.getElementById('ev-notes').value = pendingNotes;
+  document.getElementById('ev-grade').value = (ev.grade !== undefined && ev.grade !== null) ? ev.grade : '';
+  document.getElementById('ev-weight').value = (ev.weight !== undefined && ev.weight !== null) ? ev.weight : '';
   populateSubjectSelect('ev-subj', ev.subj);
   renderEventLinks();
+  updateGradeSectionVisibility();
+  updateGradeHint();
   document.getElementById('ev-delete').style.display = 'block';
   document.getElementById('ev-duplicate').style.display = 'block';
   document.getElementById('ev-link-add').style.display = 'none';
   document.getElementById('modal-event').classList.add('open');
+}
+
+// Show grade section only for entrega/examen (not clase)
+function updateGradeSectionVisibility(){
+  const type = document.getElementById('ev-type').value;
+  const section = document.getElementById('ev-grade-section');
+  if(section) section.style.display = (type === 'clase') ? 'none' : 'block';
+}
+
+// Show a live hint based on the entered grade
+function updateGradeHint(){
+  const gradeVal = document.getElementById('ev-grade').value;
+  const hint = document.getElementById('ev-grade-hint');
+  if(!hint) return;
+  if(gradeVal === '' || isNaN(parseFloat(gradeVal))){
+    hint.style.display = 'none';
+    return;
+  }
+  const g = parseFloat(gradeVal);
+  let msg = '';
+  if(g >= 9) msg = `<strong>${fmtGrade(g)}</strong> · sobresaliente`;
+  else if(g >= 7) msg = `<strong>${fmtGrade(g)}</strong> · notable`;
+  else if(g >= 5) msg = `<strong>${fmtGrade(g)}</strong> · aprobado`;
+  else msg = `<strong>${fmtGrade(g)}</strong> · suspenso`;
+  hint.innerHTML = msg;
+  hint.style.display = 'block';
+}
+
+// Format a grade nicely (Spanish decimals)
+function fmtGrade(g){
+  return Number(g).toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 2});
 }
 
 function populateSubjectSelect(id, selected){
@@ -3965,10 +4284,20 @@ function saveEvent(){
   const type = document.getElementById('ev-type').value;
   const notes = document.getElementById('ev-notes').value.trim();
   if(!title || !date){ showToast('faltan datos'); return; }
+
+  // Parse grade and weight (only relevant for entrega/examen)
+  const gradeRaw = document.getElementById('ev-grade').value;
+  const weightRaw = document.getElementById('ev-weight').value;
+  const grade = (type !== 'clase' && gradeRaw !== '' && !isNaN(parseFloat(gradeRaw)))
+    ? Math.min(10, Math.max(0, parseFloat(gradeRaw))) : null;
+  const weight = (type !== 'clase' && weightRaw !== '' && !isNaN(parseFloat(weightRaw)))
+    ? Math.min(100, Math.max(0, parseFloat(weightRaw))) : null;
+
   const data = {
     title, date, subj, type, done: false,
     notes,
-    links: [...pendingLinks]
+    links: [...pendingLinks],
+    grade, weight
   };
   if(editingEventIdx !== null){
     const wasDone = STATE.events[editingEventIdx].done;
@@ -4264,7 +4593,19 @@ function renderChips(){
 // ═══════════════════════════════════════════
 function getIaSystemPrompt(){
   const ctx = {
-    subjects: STATE.subjects.map(s => ({id: s.id, name: s.name, weeklyHours: s.weeklyHours, progress: s.progress})),
+    subjects: STATE.subjects.map(s => {
+      const g = computeSubjectGrade(s.id);
+      const hoursLogged = STATE.sessionLogs.filter(l => l.subjId === s.id).reduce((acc,l)=>acc+l.minutes,0)/60;
+      return {
+        id: s.id, name: s.name, weeklyHours: s.weeklyHours, progress: s.progress,
+        // grade context: helps the IA tailor plans based on past performance
+        avg_grade: (g.hasData && g.average !== null) ? Math.round(g.average*100)/100 : null,
+        graded_count: g.hasData ? g.gradedCount : 0,
+        pending_eval: g.hasData ? g.pendingCount : 0,
+        target_grade: (s.targetGrade !== undefined && s.targetGrade !== null) ? s.targetGrade : null,
+        hours_logged: Math.round(hoursLogged*10)/10
+      };
+    }),
     events_count: STATE.events.length,
     has_schedule: STATE.schedule.length > 0,
     has_plan: !!STATE.weeklyPlan,
@@ -4284,6 +4625,49 @@ CAPACIDADES:
 3. configurar horario semanal de clases
 4. generar un plan de trabajo con sesiones de estudio, fases y pasos concretos
 5. responder preguntas sobre planificación
+6. extraer los pesos de evaluación (%) del plan docente si el estudiante lo sube
+
+⚠️ EXTRACCIÓN EXPERTA DE DOCUMENTOS E IMÁGENES:
+cuando el estudiante adjunte un PDF (plan docente, guía de la asignatura, calendario académico, syllabus) o una imagen (foto del horario, captura del campus virtual, pizarra con fechas, tabla de evaluación), tu trabajo es LEERLO COMPLETO y volcar TODA la información útil a la estructura de plan. actúa como un planificador experto que no deja escapar ningún dato:
+
+QUÉ BUSCAR Y EXTRAER:
+- NOMBRE de la asignatura → créala en subjects si no existe
+- FECHAS de entregas, exámenes parciales, examen final, prácticas → un evento por cada una con su fecha exacta (type correcto: entrega/examen/clase)
+- PESOS de evaluación (%) → campo weight de cada evento. busca tablas tipo "examen final 40%, prácticas 35%, participación 25%"
+- HORARIO de clases recurrentes (días + horas) → entradas en schedule con type:"clase"
+- HORAS de dedicación estimadas (ECTS, "se recomiendan X horas semanales") → weekly_hours de la asignatura
+- TEMARIO o bloques → úsalo para crear pasos (steps) realistas en el weekly_plan
+- PROFESOR, aula, grupo → inclúyelo en el title o notes del evento si es relevante
+
+CÓMO PROCESAR:
+- lee TODAS las páginas/secciones del documento, no solo la primera
+- si una fecha está incompleta (ej. "entrega en la semana 12" sin fecha exacta), calcula la fecha aproximada a partir del calendario académico si lo tienes, o pregunta
+- si hay varias asignaturas en un mismo documento (ej. horario completo del cuatrimestre), créalas TODAS
+- normaliza fechas a YYYY-MM-DD. ojo con el formato día/mes europeo (15/03 = 15 de marzo, no 3 de quince)
+- si el año no está explícito, infiere el curso académico actual a partir de la fecha de hoy del contexto
+- tras extraer, haz un RESUMEN claro de lo que has detectado y añadido ("he detectado 3 asignaturas, 8 entregas, 2 exámenes y el horario de clases; he añadido todo y creado un plan inicial")
+
+SÉ EXHAUSTIVO PERO NO INVENTES: extrae todo lo que esté en el documento, pero si un dato no aparece (ej. los pesos no vienen), no lo inventes — déjalo vacío y, si es importante, dilo ("el plan docente no especifica los pesos de evaluación, dímelos si los conoces").
+
+DESPUÉS DE EXTRAER, PLANIFICA: una vez volcada la información, genera automáticamente un weekly_plan inicial coherente con las fechas detectadas y las notas objetivo (si las hay), sin esperar a que el estudiante lo pida — ya tiene todo el contexto que necesita.
+
+PLANIFICACIÓN BASADA EN RENDIMIENTO Y NOTA OBJETIVO:
+en el contexto tienes, por asignatura: avg_grade (nota media obtenida hasta ahora, escala 0-10), graded_count (cuántas notas tiene), pending_eval (evaluaciones pendientes), target_grade (nota que el estudiante quiere sacar, null si no la ha puesto = objetivo 5 por defecto) y hours_logged (horas de estudio registradas).
+
+la NOTA OBJETIVO es la variable más importante para decidir cuánto tiempo dedicar a cada asignatura. razona así:
+
+1. CALCULA LA BRECHA: gap = target_grade − avg_grade (si no hay avg_grade todavía, usa la dificultad percibida o asume gap moderado).
+2. ESCALA EL ESFUERZO según la brecha y cuánto queda por evaluar (pending_eval):
+   - gap ≤ 0 (ya va por encima del objetivo): carga MÍNIMA de mantenimiento. Reasigna ese tiempo a asignaturas con más brecha. Dilo: "en X ya superas tu objetivo, bajo su carga para reforzar otras".
+   - gap 0,5–1,5 (cerca del objetivo): carga estándar, repaso de consolidación.
+   - gap 1,5–3 (lejos): carga alta, +50-80% de horas, sesiones más frecuentes y centradas en práctica activa.
+   - gap > 3 (muy lejos) con mucho pendiente: carga máxima dentro del límite diario, prioridad 1, sesiones casi diarias. Avisa con franqueza de que el objetivo es exigente y propón un plan realista.
+3. PONDERA POR LO QUE QUEDA EN JUEGO: una asignatura con target alto Y mucho peso pendiente (pending_eval alto) es donde más rinde cada hora. Concéntrate ahí.
+4. AJUSTA EL MÉTODO, NO SOLO LAS HORAS: si hours_logged es alto pero avg_grade sigue bajo respecto al target, el problema es el método, no la cantidad. Cambia la naturaleza de las sesiones (más ejercicios tipo examen, autoevaluación, casos prácticos; menos relectura pasiva) y dilo explícitamente.
+5. SÉ REALISTA: si para alcanzar todos los objetivos harían falta más horas de las que caben en el día (máx 6h efectivas), prioriza por brecha×peso y avisa de qué objetivos son alcanzables y cuáles requerirían bajar expectativas o empezar antes.
+6. EXPLICA EL PORQUÉ: cuando ajustes la carga por nota objetivo, menciónalo en lenguaje natural ("en estructuras llevas 4,5, quieres un 7 y queda el 60% por evaluar: le asigno 3 sesiones semanales y las enfoco a problemas de examen").
+
+cuando el estudiante mencione qué nota quiere ("quiero sacar un 8 en cálculo", "con aprobar física me vale"), ponlo en target_grade del array subjects (8 y 5 respectivamente) y replanifica en consecuencia.
 
 ⚠️ REGLA CRÍTICA — VINCULACIÓN DE ASIGNATURAS:
 todo evento, bloque de horario o sesión de plan DEBE vincularse a un id de asignatura existente. si el estudiante menciona una asignatura que no existe en el contexto actual:
@@ -4304,12 +4688,17 @@ primero responde con una propuesta breve en lenguaje natural ("voy a hacer X, Y,
 PARA CAMBIOS PEQUEÑOS (1-2 modificaciones puntuales) o cuando el estudiante ya ha confirmado:
 responde con json dentro de bloques \`\`\`json ... \`\`\`:
 {
-  "subjects": [{"id":"sin_acentos","name":"nombre","color":"#hex","weekly_hours":6,"priority":1,"progress":0}],
-  "events": [{"date":"YYYY-MM-DD","title":"nombre","subject":"id","type":"entrega|examen|clase","action":"add|update|delete","new_date":"YYYY-MM-DD"}],
+  "subjects": [{"id":"sin_acentos","name":"nombre","color":"#hex","weekly_hours":6,"priority":1,"progress":0,"target_grade":5}],
+  "events": [{"date":"YYYY-MM-DD","title":"nombre","subject":"id","type":"entrega|examen|clase","weight":40,"action":"add|update|delete","new_date":"YYYY-MM-DD"}],
   "schedule": [{"day":0,"subj":"id","startH":9,"endH":12,"type":"clase|estudio|tarea","title":"nombre"}],
   "weekly_plan": [{"week":"YYYY-MM-DD","week_label":"texto","sessions":[{"subject":"id","hours":3,"task":"descripción"}],"steps":["paso 1","paso 2"],"rest_hours":16,"day_breakdown":[{"day":"lun","subject":"id","hours":2}]}],
   "summary": "resumen breve"
 }
+
+⚠️ PESOS DE EVALUACIÓN (campo "weight"):
+si el estudiante sube el plan docente (PDF o imagen) o menciona cuánto vale cada examen/entrega, extrae el peso de cada uno en porcentaje (0-100) y ponlo en el campo "weight" del evento correspondiente. esto permite a la app calcular la media ponderada y predecir qué nota necesita para aprobar. ejemplo: si el plan dice "examen final 50%, prácticas 30%, trabajo 20%", crea los tres eventos con weight:50, weight:30, weight:20. la suma de pesos de una asignatura debería dar 100. NO inventes pesos si no tienes la información — déjalo sin weight.
+
+NOTA: no puedes poner las notas obtenidas (campo grade), eso lo rellena el estudiante manualmente cuando recibe la calificación. tú solo defines los pesos.
 
 ORDEN DE LOS ARRAYS EN EL JSON:
 1. subjects (siempre primero, crea asignaturas nuevas si hace falta)
@@ -4389,7 +4778,7 @@ async function sendMsg(){
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens: 4000,
+        max_tokens: 8000,
         system: getIaSystemPrompt(),
         messages: apiMessages
       })
@@ -4532,19 +4921,22 @@ function importAIPlan(txt){
       data.subjects.forEach(ds => {
         const id = ds.id || ds.subject;
         if(!id) return;
+        const tg = (ds.target_grade != null && !isNaN(ds.target_grade)) ? Math.min(10, Math.max(0, parseFloat(ds.target_grade))) : null;
         const ex = getSub(id);
         if(ex){
           if(ds.weekly_hours != null) ex.weeklyHours = ds.weekly_hours;
           if(ds.progress != null) ex.progress = ds.progress;
           if(ds.name) ex.name = ds.name;
           if(ds.color) ex.color = ds.color;
+          if(tg != null) ex.targetGrade = tg;
         } else {
           const color = ds.color || SUBJECT_COLORS[STATE.subjects.length % SUBJECT_COLORS.length];
           STATE.subjects.push({
             id, name: ds.name || id, color,
             progress: ds.progress || 0,
             weeklyHours: ds.weekly_hours || 0,
-            weeklyTracked: 0
+            weeklyTracked: 0,
+            targetGrade: tg
           });
           logChange('add', `nueva asignatura: ${ds.name || id}`);
         }
@@ -4578,20 +4970,30 @@ function importAIPlan(txt){
           if(ex){
             const oldDate = ex.date;
             ex.date = ev.new_date || ev.date;
+            // Update weight if the IA provided one
+            if(ev.weight !== undefined && ev.weight !== null && !isNaN(ev.weight)){
+              ex.weight = Math.min(100, Math.max(0, parseFloat(ev.weight)));
+            }
             if(oldDate !== ex.date){
               const od = new Date(oldDate); const nd = new Date(ex.date);
               logChange('update', `${ev.title} (${subName}) movido del ${od.getDate()}/${od.getMonth()+1} al ${nd.getDate()}/${nd.getMonth()+1}`);
             }
           } else {
-            STATE.events.push({date: ev.date, title: ev.title, subj, type: ev.type || 'entrega', done: false});
+            const w = (ev.weight !== undefined && ev.weight !== null && !isNaN(ev.weight)) ? Math.min(100, Math.max(0, parseFloat(ev.weight))) : null;
+            STATE.events.push({date: ev.date, title: ev.title, subj, type: ev.type || 'entrega', done: false, weight: w, grade: null});
             logChange('add', `nuevo: ${ev.title} (${subName})`);
           }
         } else {
           const ex = STATE.events.find(e => e.date === ev.date && e.title === ev.title);
           if(!ex){
-            STATE.events.push({date: ev.date, title: ev.title, subj, type: ev.type || 'entrega', done: false});
+            const w = (ev.weight !== undefined && ev.weight !== null && !isNaN(ev.weight)) ? Math.min(100, Math.max(0, parseFloat(ev.weight))) : null;
+            STATE.events.push({date: ev.date, title: ev.title, subj, type: ev.type || 'entrega', done: false, weight: w, grade: null});
             const d = new Date(ev.date);
-            logChange('add', `nuevo: ${ev.title} (${subName}) — ${d.getDate()}/${d.getMonth()+1}`);
+            const wNote = w !== null ? ` · ${w}%` : '';
+            logChange('add', `nuevo: ${ev.title} (${subName})${wNote} — ${d.getDate()}/${d.getMonth()+1}`);
+          } else if(ev.weight !== undefined && ev.weight !== null && !isNaN(ev.weight)){
+            // Event exists but IA is now adding/updating its weight
+            ex.weight = Math.min(100, Math.max(0, parseFloat(ev.weight)));
           }
         }
       });
