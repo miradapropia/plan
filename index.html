@@ -569,6 +569,10 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
   display:flex;align-items:center;justify-content:center;line-height:1;
   transition:all .15s;padding:0;font-family:inherit}
 .day-note-btn:hover{border-color:var(--black);color:var(--black);background:var(--g100)}
+.day-note-btn.has-note{background:#FFF3C4;border-color:#E8D070;color:#8a7510}
+.day-note-btn.has-note:hover{background:#FFEAA0;border-color:#D4BC50;color:#5a4f08}
+html.dark .day-note-btn.has-note{background:#3a3520;border-color:#5a4f30;color:#e8d8a8}
+html.dark .day-note-btn.has-note:hover{background:#4a4528;border-color:#6a5f3a;color:#f0e4b0}
 
 /* Note banner inside week day column */
 .day-note-banner{position:absolute;left:2px;right:2px;top:4px;
@@ -1231,13 +1235,22 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
 }
 
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
 <script type="module">
   // Load PDF.js for in-browser PDF text extraction (avoids sending heavy base64 PDFs
   // to the serverless function, which caused processing timeouts).
-  import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
-  window.pdfjsLib = pdfjsLib;
+  // We expose a promise so the extractor can await readiness, and flag failures.
+  window.pdfReady = (async () => {
+    try {
+      const pdfjsLib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
+      window.pdfjsLib = pdfjsLib;
+      return true;
+    } catch(err) {
+      console.error('PDF.js failed to load:', err);
+      window.pdfLoadFailed = true;
+      return false;
+    }
+  })();
 </script>
 </head>
 <body>
@@ -3830,7 +3843,7 @@ function renderWeek(){
       <div class="day-sch-header" onclick="goToDay('${ds}')" style="cursor:pointer" title="ver detalle del día">
         <div class="day-sch-lbl">${DLBLS[i]}</div>
         <div class="day-sch-num">${d.getDate()}</div>
-        <button class="day-note-btn" onclick="event.stopPropagation();openNote('${ds}')" title="${hasNote ? 'editar nota' : 'añadir nota'}">
+        <button class="day-note-btn ${hasNote ? 'has-note' : ''}" onclick="event.stopPropagation();openNote('${ds}')" title="${hasNote ? 'nota: ' + hasNote.replace(/"/g,'&quot;') : 'añadir nota'}">
           ${hasNote ? '✎' : '+'}
         </button>
       </div>
@@ -3841,13 +3854,8 @@ function renderWeek(){
       dayCols += `<div class="time-line"></div>`;
     }
 
-    // Note marker (banner if note exists)
-    if(hasNote){
-      dayCols += `<div class="day-note-banner" onclick="event.stopPropagation();openNote('${ds}')" title="${hasNote.replace(/"/g,'&quot;')}">
-        <span class="note-icon">✎</span>
-        <span class="note-text">${hasNote.length > 24 ? hasNote.substring(0,22) + '…' : hasNote}</span>
-      </div>`;
-    }
+    // (Las notas del día se muestran con el botón ✎ de la cabecera —arriba—,
+    //  no como banner flotante, así nunca tapan los bloques de horario.)
 
     // Now line with label
     if(isToday && nowPx >= 0 && nowPx <= HOURS*SLOT_H){
@@ -4386,8 +4394,8 @@ function renderGantt(){
     const filterNote = selectedSubjId
       ? `<div class="gantt-empty-sub">tienes filtrada la asignatura "<strong>${getSub(selectedSubjId)?.name || selectedSubjId}</strong>" y no tiene eventos.<br>quita el filtro tocando "todas" en el panel de asignaturas.</div>`
       : (STATE.events.length
-          ? `<div class="gantt-empty-sub">hay eventos pero no se pudieron vincular.<br>recarga la página o pídele a la ia que reorganice tu plan.</div>`
-          : `<div class="gantt-empty-sub">habla con la ia para configurar tu cuatrimestre<br>y ver el gantt completo con fases y hitos.</div>`);
+          ? `<div class="gantt-empty-sub">hay ${STATE.events.length} evento(s) y ${STATE.subjects.length} asignatura(s) pero no se pudieron mostrar.<br>recarga la página o pídele a la ia que reorganice tu plan.</div>`
+          : `<div class="gantt-empty-sub">no hay eventos todavía. habla con la ia para configurar tu cuatrimestre,<br>o crea entregas y exámenes manualmente.</div>`);
     document.getElementById('gantt-wrap').innerHTML = `
       <div class="gantt-empty-state">
         <div class="gantt-empty-inner">
@@ -5101,11 +5109,16 @@ async function extractPdfText(f){
   renderChips();
 
   try{
-    if(!window.pdfjsLib){
-      // PDF.js not loaded yet — wait briefly
-      await new Promise(r => setTimeout(r, 600));
+    // Wait for PDF.js to finish loading (it's an async module import)
+    if(window.pdfReady){
+      await window.pdfReady;
+    } else {
+      // Give the module script a moment to register
+      await new Promise(r => setTimeout(r, 1500));
     }
-    if(!window.pdfjsLib) throw new Error('pdfjs not loaded');
+    if(window.pdfLoadFailed || !window.pdfjsLib){
+      throw new Error('pdfjs-unavailable');
+    }
 
     const arrayBuffer = await f.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({data: arrayBuffer}).promise;
@@ -5123,16 +5136,13 @@ async function extractPdfText(f){
     if(entry){
       entry.processing = false;
       if(fullText.length < 20){
-        // Likely a scanned/image PDF with no extractable text — fall back to base64 image-style
-        entry.extractedText = '';
+        // Scanned/image PDF with no extractable text
         entry.scanned = true;
-        // Re-read as base64 so the model can at least OCR visually (first page only via image not feasible here)
-        // We keep it as a doc with a note.
-        entry.extractedText = '[el pdf no contiene texto seleccionable — puede ser escaneado. el estudiante debería describir su contenido o subir una foto de las páginas relevantes]';
-        showToast(`${f.name}: pdf sin texto seleccionable`);
+        entry.extractedText = '[el pdf no contiene texto seleccionable — probablemente es escaneado. pídele al estudiante una foto de las páginas con el calendario o la evaluación]';
+        showToast(`${f.name}: pdf escaneado, sin texto`);
       } else {
         entry.extractedText = fullText;
-        showToast(`${f.name}: ${maxPages} pág. leídas`);
+        showToast(`✓ ${f.name}: ${maxPages} pág. leídas`);
       }
     }
     renderChips();
@@ -5142,7 +5152,11 @@ async function extractPdfText(f){
     if(entry){
       entry.processing = false;
       entry.error = true;
-      showToast(`no pude leer ${f.name}`);
+      if(err.message === 'pdfjs-unavailable'){
+        showToast('no se pudo cargar el lector de pdf · pega el texto del pdf en el chat');
+      } else {
+        showToast(`no pude leer ${f.name} · pega el texto en el chat`);
+      }
     }
     renderChips();
   }
@@ -5307,11 +5321,21 @@ cuando crees un weekly_plan con sessions, también DEBES crear entradas correspo
 si el plan dice "sesión de física 2h el martes", añade también un schedule:
 {"day":1,"subj":"fisica_2","startH":18,"endH":20,"type":"estudio","title":"física 2 · estudio"}
 
-PARA CAMBIOS GRANDES (más de 3 modificaciones, o reorganización del plan):
-primero responde con una propuesta breve en lenguaje natural ("voy a hacer X, Y, Z. ¿lo aplico?") sin json. el estudiante confirmará.
+⚠️ CUÁNDO ACTUAR DE INMEDIATO (generar json directamente en el MISMO turno, SIN pedir confirmación):
+- SIEMPRE que el estudiante suba un PDF o imagen (plan docente, horario, calendario, captura): extrae TODA la información y créala YA con json. NO propongas y esperes — el estudiante subió el archivo justamente para que lo vuelques al plan. quedarte en una propuesta deja su plan vacío y es exactamente lo que NO quiere.
+- SIEMPRE que el plan esté vacío o casi vacío (primera configuración): crea asignaturas, eventos, horario y plan de una vez.
+- cuando el estudiante pida explícitamente "organiza", "crea", "añade", "configura", "monta mi plan", "identifica las asignaturas", etc.
+- cambios pequeños (1-2 modificaciones puntuales).
+- cuando el estudiante ya ha confirmado una propuesta anterior.
 
-PARA CAMBIOS PEQUEÑOS (1-2 modificaciones puntuales) o cuando el estudiante ya ha confirmado:
-responde con json dentro de bloques \`\`\`json ... \`\`\`:
+en TODOS estos casos responde CON json dentro de bloques \`\`\`json ... \`\`\`. puedes poner una frase breve de resumen ANTES del json (ej: "he detectado 4 asignaturas, 9 entregas y 2 exámenes, los añado:"), pero el json DEBE estar siempre presente. sin json no se crea nada.
+
+⚠️ CUÁNDO PROPONER PRIMERO (texto sin json, esperar confirmación):
+SOLO cuando vas a BORRAR o reorganizar drásticamente un plan que YA está lleno (ej: "bórralo todo y empieza de cero", "reorganiza por completo las 8 semanas"). di brevemente qué harás y espera el "sí".
+
+ante cualquier duda, ACTÚA y genera el json. es mejor crear y luego ajustar que dejar el plan vacío.
+
+FORMATO DEL JSON (dentro de bloques \`\`\`json ... \`\`\`):
 {
   "subjects": [{"id":"sin_acentos","name":"nombre","color":"#hex","weekly_hours":6,"priority":1,"progress":0,"target_grade":5}],
   "events": [{"date":"YYYY-MM-DD","title":"nombre","subject":"id","type":"entrega|examen|clase","weight":40,"action":"add|update|delete","new_date":"YYYY-MM-DD"}],
