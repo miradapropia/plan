@@ -613,6 +613,14 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
   max-height:54px}
 .ia-cmd.open{max-height:min(620px, calc(100vh - 36px))}
 html.dark .ia-cmd{box-shadow:0 6px 26px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.3)}
+.ia-cmd.drag-over{border-color:var(--black);border-style:dashed;border-width:2px;
+  box-shadow:0 6px 32px rgba(10,10,10,.18)}
+.ia-cmd.drag-over::before{content:'suelta aquí tus pdf o imágenes';
+  position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(250,250,250,.94);font-size:12px;letter-spacing:.5px;color:var(--black);
+  border-radius:13px;pointer-events:none}
+html.dark .ia-cmd.drag-over::before{background:rgba(20,20,19,.94);color:var(--g100)}
+body.ambient-on .ia-cmd.drag-over::before{background:rgba(0,0,0,.85);color:#fff}
 
 .ia-cmd-conversation{display:flex;flex-direction:column;flex:1;overflow:hidden;
   opacity:0;pointer-events:none;transition:opacity .25s ease}
@@ -1916,7 +1924,29 @@ function saveState(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(STATE));
+      // Build a persist-safe copy: strip heavy base64 file data from iaMessages
+      // (the in-memory STATE.iaMessages keeps full content for the active session;
+      //  only the saved copy is slimmed down so localStorage doesn't overflow).
+      const persistable = {
+        ...STATE,
+        iaMessages: (STATE.iaMessages || []).map(m => {
+          if(Array.isArray(m.content)){
+            // Replace any document/image blocks with a light text note
+            const hasMedia = m.content.some(b => b.type === 'document' || b.type === 'image');
+            if(hasMedia){
+              const textBlock = m.content.find(b => b.type === 'text');
+              return {
+                role: m.role,
+                content: (textBlock ? textBlock.text : '') + '\n[archivos adjuntos procesados]',
+                displayText: m.displayText,
+                hadFiles: true
+              };
+            }
+          }
+          return m;
+        })
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
     }catch(e){
       console.error('Save failed:', e);
     }
@@ -2427,6 +2457,70 @@ function resetAll(){
 // UTILITIES
 // ═══════════════════════════════════════════
 function getSub(id){ return STATE.subjects.find(s => s.id === id); }
+
+// Normalize a string to a canonical subject-id form (lowercase, no accents, underscores)
+function normalizeSubjId(str){
+  if(!str) return '';
+  return String(str).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+// Find a subject by fuzzy matching: exact id, then normalized id, then normalized name
+function findSubjFuzzy(ref){
+  if(!ref) return null;
+  // 1. exact id match
+  let s = STATE.subjects.find(x => x.id === ref);
+  if(s) return s;
+  // 2. normalized id match
+  const norm = normalizeSubjId(ref);
+  s = STATE.subjects.find(x => normalizeSubjId(x.id) === norm);
+  if(s) return s;
+  // 3. normalized name match
+  s = STATE.subjects.find(x => normalizeSubjId(x.name) === norm);
+  if(s) return s;
+  return null;
+}
+
+// Heal subject-id mismatches across events and schedule.
+// The IA sometimes references a subject with a slightly different id than the one
+// in the subjects array (case, accents, separators). This remaps them so every
+// event/schedule points to a real subject, which is what the views render by.
+function healSubjectLinks(){
+  let healed = 0;
+  STATE.events.forEach(ev => {
+    if(ev.subj && !getSub(ev.subj)){
+      const match = findSubjFuzzy(ev.subj);
+      if(match){ ev.subj = match.id; healed++; }
+    }
+  });
+  STATE.schedule.forEach(b => {
+    if(b.subj && !getSub(b.subj)){
+      const match = findSubjFuzzy(b.subj);
+      if(match){ b.subj = match.id; healed++; }
+    }
+  });
+  // Also heal weekly_plan session subject references
+  if(STATE.weeklyPlan && Array.isArray(STATE.weeklyPlan.weekly_plan)){
+    STATE.weeklyPlan.weekly_plan.forEach(w => {
+      (w.sessions || []).forEach(s => {
+        const ref = s.subject || s.subj;
+        if(ref && !getSub(ref)){
+          const match = findSubjFuzzy(ref);
+          if(match) s.subject = match.id;
+        }
+      });
+      (w.day_breakdown || []).forEach(d => {
+        const ref = d.subject || d.subj;
+        if(ref && !getSub(ref)){
+          const match = findSubjFuzzy(ref);
+          if(match) d.subject = match.id;
+        }
+      });
+    });
+  }
+  return healed;
+}
 
 // ═══════════════════════════════════════════
 // GRADES — weighted average + prediction per subject
@@ -3947,8 +4041,8 @@ function renderGantt(){
   visibleSubjs.forEach(sub => {
     const subjEvs = evs.filter(e => e.subj === sub.id).sort((a,b) => new Date(a.date) - new Date(b.date));
     if(!subjEvs.length) return;
-    const subjSessions = STATE.weeklyPlan ? STATE.weeklyPlan.weekly_plan.flatMap(w =>
-      w.sessions.filter(s => s.subject === sub.id).map(s => ({week: w.week, task: s.task, hours: s.hours}))
+    const subjSessions = (STATE.weeklyPlan && Array.isArray(STATE.weeklyPlan.weekly_plan)) ? STATE.weeklyPlan.weekly_plan.flatMap(w =>
+      (w.sessions || []).filter(s => (s.subject || s.subj) === sub.id).map(s => ({week: w.week, task: s.task, hours: s.hours}))
     ) : [];
     const phases = subjSessions.length > 0 ? subjSessions :
       [{task:'investigación y conceptos'},{task:'desarrollo y producción'},{task:'acabado y presentación'}];
@@ -4571,6 +4665,39 @@ function processFiles(files){
 
 function removeFile(i){ pendingFiles.splice(i, 1); renderChips(); }
 
+// ── DRAG & DROP files onto the IA command bar ──
+function setupDragAndDrop(){
+  const cmd = document.getElementById('ia-cmd');
+  if(!cmd) return;
+  let dragCounter = 0;
+
+  // Prevent the browser from opening the file when dropped anywhere
+  ['dragenter','dragover','dragleave','drop'].forEach(evt => {
+    document.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
+  });
+
+  document.addEventListener('dragenter', e => {
+    if(e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')){
+      dragCounter++;
+      cmd.classList.add('drag-over');
+      openIaCmd();
+    }
+  });
+  document.addEventListener('dragleave', e => {
+    dragCounter--;
+    if(dragCounter <= 0){ dragCounter = 0; cmd.classList.remove('drag-over'); }
+  });
+  document.addEventListener('drop', e => {
+    dragCounter = 0;
+    cmd.classList.remove('drag-over');
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+      processFiles([...e.dataTransfer.files]);
+      openIaCmd();
+      document.getElementById('ia-input').focus();
+    }
+  });
+}
+
 function renderChips(){
   const upload = document.getElementById('ia-upload');
   const el = document.getElementById('file-chips');
@@ -4650,6 +4777,9 @@ CÓMO PROCESAR:
 SÉ EXHAUSTIVO PERO NO INVENTES: extrae todo lo que esté en el documento, pero si un dato no aparece (ej. los pesos no vienen), no lo inventes — déjalo vacío y, si es importante, dilo ("el plan docente no especifica los pesos de evaluación, dímelos si los conoces").
 
 DESPUÉS DE EXTRAER, PLANIFICA: una vez volcada la información, genera automáticamente un weekly_plan inicial coherente con las fechas detectadas y las notas objetivo (si las hay), sin esperar a que el estudiante lo pida — ya tiene todo el contexto que necesita.
+
+⚠️ MEMORIA DE LA CONVERSACIÓN:
+recuerdas TODO lo que ha pasado en esta conversación: los archivos que el estudiante ha subido, lo que extrajiste de ellos, sus respuestas y las asignaturas/eventos/horario que ya has creado (están en el CONTEXTO ACTUAL de arriba). NUNCA vuelvas a pedir un archivo que ya te han subido ni preguntes información que ya tienes en el contexto. si el estudiante dice "añade una sesión más de física", ya sabes qué es física y cuándo tiene cosas; actúa directamente. solo pregunta si falta un dato que de verdad no aparece por ningún lado.
 
 PLANIFICACIÓN BASADA EN RENDIMIENTO Y NOTA OBJETIVO:
 en el contexto tienes, por asignatura: avg_grade (nota media obtenida hasta ahora, escala 0-10), graded_count (cuántas notas tiene), pending_eval (evaluaciones pendientes), target_grade (nota que el estudiante quiere sacar, null si no la ha puesto = objetivo 5 por defecto) y hours_logged (horas de estudio registradas).
@@ -4758,18 +4888,24 @@ async function sendMsg(){
 
   const fileNames = pendingFiles.map(f => f.name).join(', ');
   const bubbleTxt = hasFiles ?
-    `📎 ${pendingFiles.length} archivo${pendingFiles.length>1?'s':''}${txt?'\n'+txt:''}` :
+    `\u{1F4CE} ${pendingFiles.length} archivo${pendingFiles.length>1?'s':''}${fileNames?' ('+fileNames+')':''}${txt?'\n'+txt:''}` :
     txt;
 
   pendingFiles = []; renderChips();
 
-  STATE.iaMessages.push({role:'user', content:blocks, displayText: bubbleTxt});
+  // Store the FULL message (with file blocks) in the in-memory conversation so the
+  // IA keeps seeing the files and everything for the active session. Persistence to
+  // localStorage strips heavy base64 (see saveState) but in-memory keeps it this session.
+  STATE.iaMessages.push({role:'user', content:blocks, displayText: bubbleTxt, hadFiles: hasFiles});
   saveState();
   addBubble('user', bubbleTxt);
 
   const typing = addTyping();
   document.getElementById('ia-send').disabled = true;
   document.getElementById('ia-status').textContent = 'pensando...';
+
+  let assistantText = '';
+  let streamBubble = null;
 
   try{
     const apiMessages = STATE.iaMessages.map(m => ({role: m.role, content: m.content}));
@@ -4784,93 +4920,129 @@ async function sendMsg(){
       })
     });
 
-    typing.remove();
-
-    // Get response as text first so we can debug 404s and HTML error pages
-    const rawText = await res.text();
-
-    // Detect specific failure modes
     if(res.status === 404){
-      // Function not deployed or running locally without netlify dev
+      typing.remove();
       const isLocal = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
       const msg = isLocal
-        ? 'la función ia no está disponible en local. necesitas desplegar en netlify (o usar `netlify dev`) para que funcione.'
-        : 'la función serverless no se encuentra (404). asegúrate de que la carpeta `netlify/functions/` se subió al repositorio.';
+        ? 'la funcion ia no esta disponible en local. necesitas desplegar en netlify (o usar `netlify dev`) para que funcione.'
+        : 'la funcion serverless no se encuentra (404). asegurate de que la carpeta `netlify/functions/` se subio al repositorio.';
       addBubble('assistant', msg);
-      STATE.iaMessages.pop(); // rollback the user message we added
+      STATE.iaMessages.pop();
       saveState();
       throw new Error('Function 404');
     }
-
-    if(res.status === 500 || res.status === 502){
-      const msg = 'error del servidor. lo más probable es que falte la variable `ANTHROPIC_API_KEY` en netlify, o que la clave esté mal. revísalo en site settings → environment variables.';
+    if(res.status === 500 || res.status === 502 || res.status === 504){
+      typing.remove();
+      const msg = res.status === 504
+        ? 'la respuesta tardo demasiado. intentalo de nuevo; si subiste un pdf muy grande, prueba con uno mas ligero o preguntame por partes.'
+        : 'error del servidor. lo mas probable es que falte la variable `ANTHROPIC_API_KEY` en netlify, o que la clave este mal. revisalo en site settings -> environment variables.';
       addBubble('assistant', msg);
       STATE.iaMessages.pop();
       saveState();
       throw new Error(`Server ${res.status}`);
     }
 
-    // Try to parse JSON
-    let data;
-    try{
-      data = JSON.parse(rawText);
-    }catch(e){
-      addBubble('assistant', `respuesta inválida del servidor (${res.status}). respuesta: ${rawText.substring(0,150)}...`);
-      STATE.iaMessages.pop();
-      saveState();
-      throw new Error('Invalid JSON');
+    const contentType = res.headers.get('content-type') || '';
+
+    if(res.body && res.body.getReader && (contentType.includes('event-stream') || contentType.includes('text/plain') || contentType === '')){
+      // STREAMING path (SSE)
+      typing.remove();
+      streamBubble = addBubble('assistant', '');
+      const bubbleContent = streamBubble.querySelector('.ia-bubble');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let apiError = null;
+
+      while(true){
+        const {done, value} = await reader.read();
+        if(done) break;
+        buffer += decoder.decode(value, {stream:true});
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for(const line of lines){
+          const trimmed = line.trim();
+          if(!trimmed || !trimmed.startsWith('data:')) continue;
+          const payload = trimmed.slice(5).trim();
+          if(payload === '[DONE]') continue;
+          try{
+            const evt = JSON.parse(payload);
+            if(evt.type === 'content_block_delta' && evt.delta && evt.delta.text){
+              assistantText += evt.delta.text;
+              bubbleContent.innerHTML = liveDisplay(assistantText);
+              document.getElementById('ia-msgs').scrollTop = document.getElementById('ia-msgs').scrollHeight;
+            } else if(evt.type === 'error'){
+              apiError = (evt.error && evt.error.message) || 'error de la api';
+            }
+          }catch(_){}
+        }
+      }
+
+      if(apiError){
+        bubbleContent.innerHTML = `error de la api: ${apiError}`;
+        STATE.iaMessages.pop();
+        saveState();
+        throw new Error('API error');
+      }
+    } else {
+      // BUFFERED fallback path
+      const rawText = await res.text();
+      typing.remove();
+      let data;
+      try{ data = JSON.parse(rawText); }
+      catch(e){
+        addBubble('assistant', `respuesta invalida del servidor (${res.status}).`);
+        STATE.iaMessages.pop(); saveState();
+        throw new Error('Invalid JSON');
+      }
+      if(data.type === 'error' || data.error){
+        const apiMsg = (data.error && data.error.message) || data.message || 'error';
+        addBubble('assistant', `error de la api: ${apiMsg}`);
+        STATE.iaMessages.pop(); saveState();
+        throw new Error('API error');
+      }
+      assistantText = (data.content && data.content[0] && data.content[0].text) || '';
+      if(!assistantText){
+        addBubble('assistant', 'la api no devolvio texto. intentalo de nuevo.');
+        STATE.iaMessages.pop(); saveState();
+        throw new Error('No content');
+      }
     }
 
-    // API-level error from anthropic
-    if(data.type === 'error' || data.error){
-      const apiMsg = data.error?.message || data.message || JSON.stringify(data.error);
-      addBubble('assistant', `error de la api: ${apiMsg}`);
-      STATE.iaMessages.pop();
-      saveState();
-      throw new Error('API error');
+    const reply = assistantText;
+
+    // Compress the user message's file blocks to a text note for in-memory history,
+    // keeping awareness that files were processed (extraction lives in STATE).
+    const lastUserMsg = STATE.iaMessages[STATE.iaMessages.length-1];
+    if(lastUserMsg && lastUserMsg.hadFiles){
+      lastUserMsg.content = msgText + '\n[archivos adjuntos procesados y volcados al plan]';
     }
 
-    const reply = data.content?.[0]?.text;
-    if(!reply){
-      addBubble('assistant', 'la api no devolvió texto. inténtalo de nuevo.');
-      STATE.iaMessages.pop();
-      saveState();
-      throw new Error('No content');
-    }
-
-    // Replace last user msg (with full base64) with text-only for storage
-    STATE.iaMessages[STATE.iaMessages.length-1] = {role:'user', content: msgText, displayText: bubbleTxt};
     STATE.iaMessages.push({role:'assistant', content: reply});
 
-    // Try to import; if there's JSON, it's a direct change
     const imported = importAIPlan(reply);
-    // Strip JSON code fences in any of these forms:
-    //   ```json ... ``` (with newlines)
-    //   ```json... ```` (no newlines)
-    //   ``` ... ``` (no language)
-    //   {...} (raw object containing 'subjects'/'events'/'schedule'/'weekly_plan' keys)
-    let display = reply
-      .replace(/```(?:json)?\s*[\s\S]*?\s*```/g, '[plan actualizado ✦]')
-      .replace(/(\{[\s\S]*?"(?:subjects|events|schedule|weekly_plan)"[\s\S]*?\})\s*$/g, '[plan actualizado ✦]')
-      .trim();
-    // Fallback: if everything got stripped or only the marker remains, replace with a default
-    if(!display || display === '[plan actualizado ✦]'){
-      display = imported ? '✦ plan actualizado' : reply.trim();
+    const finalDisplay = computeFinalDisplay(reply, imported);
+
+    if(streamBubble){
+      streamBubble.querySelector('.ia-bubble').innerHTML = finalDisplay;
+    } else {
+      addBubble('assistant', finalDisplay);
     }
-    addBubble('assistant', display);
 
     if(imported){
-      showToast('✦ plan actualizado');
+      showToast('\u2726 plan actualizado');
       renderAll();
     }
-
     saveState();
+
   }catch(err){
-    // typing already removed above; if not, remove now
     if(typing.parentNode) typing.remove();
     if(!err.message.match(/Function 404|Server |Invalid JSON|API error|No content/)){
-      // Network-level error (fetch failed)
-      addBubble('assistant', 'error de red. comprueba tu conexión a internet.');
+      if(streamBubble){
+        streamBubble.querySelector('.ia-bubble').innerHTML = 'error de red. comprueba tu conexion e intentalo de nuevo.';
+      } else {
+        addBubble('assistant', 'error de red. comprueba tu conexion a internet.');
+      }
     }
     console.error('IA error:', err);
   }
@@ -4878,6 +5050,32 @@ async function sendMsg(){
   document.getElementById('ia-send').disabled = false;
   document.getElementById('ia-status').textContent = 'listo';
   inp.focus();
+}
+
+// Display text live during streaming, replacing any JSON block with a placeholder
+function liveDisplay(text){
+  let d = text;
+  const openFence = d.indexOf('```');
+  if(openFence !== -1){
+    d = d.slice(0, openFence) + '\u200B';
+  }
+  d = d
+    .replace(/\u200B/g, '<em style="opacity:.6">[actualizando plan...]</em>')
+    .replace(/\n/g, '<br>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  return d;
+}
+
+// Compute the final cleaned display text after the full reply is in
+function computeFinalDisplay(reply, imported){
+  let display = reply
+    .replace(/```(?:json)?\s*[\s\S]*?\s*```/g, '[plan actualizado \u2726]')
+    .replace(/(\{[\s\S]*?"(?:subjects|events|schedule|weekly_plan)"[\s\S]*?\})\s*$/g, '[plan actualizado \u2726]')
+    .trim();
+  if(!display || display === '[plan actualizado \u2726]'){
+    display = imported ? '\u2726 plan actualizado' : reply.trim();
+  }
+  return display.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 }
 
 function addBubble(role, text){
@@ -4945,16 +5143,21 @@ function importAIPlan(txt){
 
     if(data.events && Array.isArray(data.events)){
       data.events.forEach(ev => {
-        const subj = ev.subject || ev.subj || 'otra';
-        // If the event references a subject that doesn't exist yet, auto-create it
-        // (best-effort: derive a friendly name from the id)
-        if(subj !== 'otra' && !getSub(subj)){
+        let subj = ev.subject || ev.subj || 'otra';
+        // First try to resolve to an existing subject by fuzzy match (case/accents/separators)
+        const fuzzy = findSubjFuzzy(subj);
+        if(fuzzy){
+          subj = fuzzy.id;
+        } else if(subj !== 'otra'){
+          // Genuinely new subject — create it
           const friendlyName = subj.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).toLowerCase();
           const color = SUBJECT_COLORS[STATE.subjects.length % SUBJECT_COLORS.length];
+          const newId = normalizeSubjId(subj) || subj;
           STATE.subjects.push({
-            id: subj, name: friendlyName, color,
-            progress: 0, weeklyHours: 0, weeklyTracked: 0
+            id: newId, name: friendlyName, color,
+            progress: 0, weeklyHours: 0, weeklyTracked: 0, targetGrade: null
           });
+          subj = newId;
           logChange('add', `nueva asignatura inferida: ${friendlyName}`);
         }
         const sub = getSub(subj);
@@ -5000,28 +5203,36 @@ function importAIPlan(txt){
     }
 
     if(data.schedule && Array.isArray(data.schedule)){
-      // Auto-create any missing subjects referenced in the schedule
+      // Resolve/create subjects referenced in the schedule via fuzzy matching
       data.schedule.forEach(s => {
-        const subj = s.subj || s.subject;
-        if(subj && subj !== 'otra' && !getSub(subj)){
+        let subj = s.subj || s.subject;
+        if(!subj) return;
+        const fuzzy = findSubjFuzzy(subj);
+        if(fuzzy){
+          s.subj = fuzzy.id; // normalize the reference in place
+        } else if(subj !== 'otra'){
           const friendlyName = subj.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).toLowerCase();
           const color = SUBJECT_COLORS[STATE.subjects.length % SUBJECT_COLORS.length];
+          const newId = normalizeSubjId(subj) || subj;
           STATE.subjects.push({
-            id: subj, name: friendlyName, color,
-            progress: 0, weeklyHours: 0, weeklyTracked: 0
+            id: newId, name: friendlyName, color,
+            progress: 0, weeklyHours: 0, weeklyTracked: 0, targetGrade: null
           });
+          s.subj = newId;
           logChange('add', `nueva asignatura inferida: ${friendlyName}`);
         }
       });
       // Preserve manual notes, links, and done state when IA replaces schedule
       const oldSchedule = STATE.schedule || [];
       STATE.schedule = data.schedule.map(s => {
+        const subjId = s.subj || s.subject;
         // Try to find a matching old block by day + start hour + subject
         const match = oldSchedule.find(o =>
-          o.day === s.day && o.startH === s.startH && o.subj === s.subj
+          o.day === s.day && o.startH === s.startH && o.subj === subjId
         );
         return {
           ...s,
+          subj: subjId,
           done: match?.done || false,
           notes: match?.notes || s.notes || '',
           links: match?.links || s.links || []
@@ -5094,6 +5305,10 @@ function importAIPlan(txt){
         }
       }
     }
+
+    // Final safety pass: remap any event/schedule/plan subject references that
+    // don't exactly match a real subject id (the #1 cause of "only one subject shows").
+    healSubjectLinks();
 
     return true;
   }catch(e){
@@ -5725,6 +5940,11 @@ function clearChangelog(){
 // ═══════════════════════════════════════════
 loadState();
 
+// Heal any pre-existing subject-id mismatches from older sessions
+// (fixes the "only one subject shows in week/month/gantt" bug for existing data)
+const _healed = healSubjectLinks();
+if(_healed > 0) saveState();
+
 // Apply theme
 applyTheme(STATE.theme || 'auto');
 
@@ -5734,6 +5954,7 @@ renderAll();
 initIaWelcome();
 renderMusic();
 renderChangelog();
+setupDragAndDrop();
 </script>
 </body>
 </html>
