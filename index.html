@@ -251,9 +251,34 @@ header{border-bottom:1px solid var(--g200);padding:12px 22px;
   display:flex;align-items:center;justify-content:space-between}
 .subj-detail-empty{font-size:10px;color:var(--g400);font-style:italic;padding:4px 0}
 
+/* add buttons in ficha sections */
+.subj-detail-add-btn{font-size:8px;letter-spacing:.5px;color:var(--g600);background:none;
+  border:1px solid var(--g300);border-radius:10px;padding:3px 9px;cursor:pointer;
+  font-family:inherit;text-transform:lowercase;transition:all .15s}
+.subj-detail-add-btn:hover{border-color:var(--black);color:var(--black)}
+.subj-detail-link-remove,.subj-detail-note-remove{background:none;border:none;color:var(--g300);
+  cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 6px;flex-shrink:0;transition:color .15s;margin-left:auto}
+.subj-detail-link-remove:hover,.subj-detail-note-remove:hover{color:var(--urgent)}
+
 /* grades section */
 .grade-target-row{display:flex;align-items:center;gap:10px;padding:8px 11px;margin-bottom:10px;
   background:var(--g100);border-radius:6px}
+
+/* prominent always-visible target section at top of ficha */
+.subj-target-section{padding-bottom:14px;border-bottom:1px solid var(--g200);margin-bottom:14px}
+.subj-target-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 13px;background:var(--g100);border-radius:8px;border:1px solid var(--g200)}
+.subj-target-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.subj-target-lbl{font-size:11px;font-weight:600;letter-spacing:.5px;color:var(--g800)}
+.subj-target-hint{font-size:9px;color:var(--g400);letter-spacing:.2px;line-height:1.3}
+.subj-target-control{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.subj-target-input{width:60px;padding:7px 8px;border:1.5px solid var(--g300);border-radius:7px;
+  font-family:'Inter',sans-serif;font-size:16px;font-weight:700;text-align:center;background:var(--white);
+  color:var(--black);outline:none;font-variant-numeric:tabular-nums;transition:border-color .15s}
+.subj-target-input:focus{border-color:var(--black)}
+.subj-target-input::placeholder{color:var(--g300);font-weight:400}
+.subj-target-max{font-size:11px;color:var(--g400);font-weight:500}
+html.dark .subj-target-input{background:var(--g200);border-color:var(--g400)}
 .grade-target-lbl{font-size:10px;letter-spacing:1px;color:var(--g600);text-transform:lowercase}
 .grade-target-input{width:56px;padding:4px 8px;border:1px solid var(--g300);border-radius:5px;
   font-family:'Inter',sans-serif;font-size:12px;font-weight:600;text-align:center;background:var(--white);
@@ -699,6 +724,8 @@ html.dark .ia-msg.user .ia-bubble{background:#f0f0eb;color:#0f0f0e}
 .chip-remove{background:none;border:none;cursor:pointer;color:var(--g400);font-size:12px;padding:0;line-height:1;flex-shrink:0;transition:color .1s}
 .chip-remove:hover{color:var(--black)}
 .chip-type-pdf{border-left:3px solid #C17817}
+.chip-processing{opacity:.7;animation:chipPulse 1.2s ease-in-out infinite}
+@keyframes chipPulse{0%,100%{opacity:.5}50%{opacity:.9}}
 .chip-type-img{border-left:3px solid #4A7C7E}
 
 .ia-cmd-bar{display:flex;align-items:center;gap:6px;padding:8px 10px;flex-shrink:0;height:54px;background:var(--white)}
@@ -1204,6 +1231,14 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
 }
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+<script type="module">
+  // Load PDF.js for in-browser PDF text extraction (avoids sending heavy base64 PDFs
+  // to the serverless function, which caused processing timeouts).
+  import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+  window.pdfjsLib = pdfjsLib;
+</script>
 </head>
 <body>
 
@@ -2643,6 +2678,55 @@ function setSubjectTarget(subjId, value){
   openSubjectDetail(subjId);
 }
 
+// ── Subject-level links (added directly from the ficha) ──
+function addSubjectLink(subjId){
+  const sub = getSub(subjId);
+  if(!sub) return;
+  const url = prompt('pega el enlace (url, ruta de carpeta o app link):');
+  if(!url || !url.trim()) return;
+  const trimmed = url.trim();
+  // Auto-detect type
+  let type = 'url';
+  if(/^([a-z]:\\|\/|~\/|\/users\/|\/home\/)/i.test(trimmed)) type = 'folder';
+  else if(!/^https?:\/\//i.test(trimmed) && /^[a-z]+:\/\//i.test(trimmed)) type = 'app';
+  if(!sub.links) sub.links = [];
+  sub.links.push({type, url: trimmed});
+  saveState();
+  openSubjectDetail(subjId);
+  showToast('enlace añadido');
+}
+
+function removeSubjectLink(subjId, idx){
+  const sub = getSub(subjId);
+  if(!sub || !sub.links) return;
+  sub.links.splice(idx, 1);
+  saveState();
+  openSubjectDetail(subjId);
+  showToast('enlace quitado');
+}
+
+// ── Subject-level notes (added directly from the ficha) ──
+function addSubjectNote(subjId){
+  const sub = getSub(subjId);
+  if(!sub) return;
+  const text = prompt('escribe una nota para esta asignatura:');
+  if(!text || !text.trim()) return;
+  if(!sub.notes) sub.notes = [];
+  sub.notes.push({text: text.trim(), date: new Date().toISOString()});
+  saveState();
+  openSubjectDetail(subjId);
+  showToast('nota añadida');
+}
+
+function removeSubjectNote(subjId, idx){
+  const sub = getSub(subjId);
+  if(!sub || !sub.notes) return;
+  sub.notes.splice(idx, 1);
+  saveState();
+  openSubjectDetail(subjId);
+  showToast('nota quitada');
+}
+
 function predictNeededGrade(subjId, target = 5){
   const g = computeSubjectGrade(subjId);
   if(!g.hasData || !g.hasWeights) return null;
@@ -2882,21 +2966,32 @@ function openSubjectDetail(id){
   let body = '';
   const today = new Date(); today.setHours(0,0,0,0);
 
+  // ── NOTA OBJETIVO — always visible and editable at the top ──
+  {
+    const curTarget = getTargetGrade(id);
+    const hasCustomTarget = sub.targetGrade !== undefined && sub.targetGrade !== null;
+    body += `<div class="subj-detail-section subj-target-section">
+      <div class="subj-target-row">
+        <div class="subj-target-info">
+          <span class="subj-target-lbl">nota objetivo</span>
+          <span class="subj-target-hint">${hasCustomTarget ? 'la ia ajusta tu plan para alcanzarla' : 'sin definir · por defecto aprobar (5)'}</span>
+        </div>
+        <div class="subj-target-control">
+          <input class="subj-target-input" type="number" min="0" max="10" step="0.5"
+            value="${hasCustomTarget ? curTarget : ''}" placeholder="5"
+            onchange="setSubjectTarget('${id}', this.value)"
+            title="nota que quieres alcanzar"/>
+          <span class="subj-target-max">/ 10</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
   // 0. GRADES — weighted average + prediction
   if(gradeInfo.hasData){
-    const curTarget = getTargetGrade(id);
-    const hasCustomTarget = (() => { const s = getSub(id); return s && s.targetGrade !== undefined && s.targetGrade !== null; })();
     body += `<div class="subj-detail-section">
       <div class="subj-detail-section-lbl">
         <span>calificaciones</span>
-      </div>
-      <div class="grade-target-row">
-        <span class="grade-target-lbl">nota objetivo</span>
-        <input class="grade-target-input" type="number" min="0" max="10" step="0.5"
-          value="${hasCustomTarget ? curTarget : ''}" placeholder="5"
-          onchange="setSubjectTarget('${id}', this.value)"
-          title="nota que quieres alcanzar en esta asignatura"/>
-        ${!hasCustomTarget ? '<span class="grade-target-default">por defecto: 5 (aprobado)</span>' : ''}
       </div>`;
 
     // List graded items
@@ -2999,8 +3094,10 @@ function openSubjectDetail(id){
   }
   body += `</div>`;
 
-  // 2. LINKS — aggregated from all events AND schedule blocks
+  // 2. LINKS — aggregated from all events AND schedule blocks AND subject-level
   const allLinkEntries = [];
+  // Subject-level links (added directly from the ficha)
+  (sub.links || []).forEach((l, li) => allLinkEntries.push({...l, contextTitle: 'asignatura', contextType: 'subject', subjLinkIdx: li}));
   allEvs.forEach(ev => {
     (ev.links || []).forEach(l => allLinkEntries.push({...l, contextTitle: ev.title, contextType: 'evento'}));
   });
@@ -3013,15 +3110,22 @@ function openSubjectDetail(id){
     }));
   });
   body += `<div class="subj-detail-section">
-    <div class="subj-detail-section-lbl">enlaces guardados</div>`;
+    <div class="subj-detail-section-lbl">
+      <span>enlaces guardados</span>
+      <button class="subj-detail-add-btn" onclick="addSubjectLink('${id}')" title="añadir enlace a esta asignatura">+ añadir</button>
+    </div>`;
   if(allLinkEntries.length){
     body += `<div class="subj-detail-link-list">`;
     allLinkEntries.forEach(l => {
       const info = getLinkInfo(l);
+      const removeBtn = l.contextType === 'subject'
+        ? `<button class="subj-detail-link-remove" onclick="event.stopPropagation();removeSubjectLink('${id}',${l.subjLinkIdx})" title="quitar">×</button>`
+        : '';
       body += `<div class="subj-detail-link" onclick="${l.type==='folder'?`navigator.clipboard.writeText('${l.url.replace(/'/g,"\\\\'")}');showToast('ruta copiada')`:`window.open('${l.url}', '_blank')`}" title="${l.url.replace(/"/g,'&quot;')}">
         <span class="subj-detail-link-icon">${info.icon}</span>
         <span class="subj-detail-link-text">${info.label}</span>
         <span class="subj-detail-link-context">${l.contextTitle}</span>
+        ${removeBtn}
       </div>`;
     });
     body += `</div>`;
@@ -3030,8 +3134,12 @@ function openSubjectDetail(id){
   }
   body += `</div>`;
 
-  // 3. NOTES — from events + session logs
+  // 3. NOTES — subject-level + from events + session logs
   const notesEntries = [];
+  // Subject-level notes (added directly from the ficha)
+  (sub.notes || []).forEach((n, ni) => {
+    notesEntries.push({type:'subject', text:n.text, label:'nota', date:n.date, subjNoteIdx:ni});
+  });
   allEvs.forEach(ev => {
     if(ev.notes && ev.notes.trim()){
       notesEntries.push({type:'event', text:ev.notes, label:ev.title, date:ev.date});
@@ -3054,15 +3162,21 @@ function openSubjectDetail(id){
   notesEntries.sort((a,b) => new Date(b.date) - new Date(a.date));
 
   body += `<div class="subj-detail-section">
-    <div class="subj-detail-section-lbl">notas y reflexiones</div>`;
+    <div class="subj-detail-section-lbl">
+      <span>notas y reflexiones</span>
+      <button class="subj-detail-add-btn" onclick="addSubjectNote('${id}')" title="añadir nota a esta asignatura">+ añadir</button>
+    </div>`;
   if(notesEntries.length){
     body += `<div class="subj-detail-note-list">`;
     notesEntries.forEach(n => {
       const d = new Date(n.date);
       const dateStr = `${d.getDate()}/${d.getMonth()+1}`;
-      const icon = n.type === 'session' ? '⏱' : n.type === 'schedule' ? '📅' : '📌';
+      const icon = n.type === 'session' ? '⏱' : n.type === 'schedule' ? '📅' : n.type === 'subject' ? '📝' : '📌';
+      const removeBtn = n.type === 'subject'
+        ? `<button class="subj-detail-note-remove" onclick="removeSubjectNote('${id}',${n.subjNoteIdx})" title="quitar">×</button>`
+        : '';
       body += `<div class="subj-detail-note">
-        <div class="subj-detail-note-meta">${icon} ${n.label} · ${dateStr}</div>
+        <div class="subj-detail-note-meta">${icon} ${n.label} · ${dateStr}${removeBtn}</div>
         <div class="subj-detail-note-text">${n.text.replace(/\n/g,'<br>')}</div>
       </div>`;
     });
@@ -3414,6 +3528,29 @@ function switchView(view, btn){
   document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
   document.getElementById(`view-${view}`).classList.add('active');
   btn.classList.add('active');
+
+  // When opening the month view, if the shown month has no events but events exist
+  // elsewhere, jump to the month of the next upcoming event (or the most recent one).
+  if(view === 'month'){
+    const monthHasEvents = STATE.events.some(e => {
+      const d = new Date(e.date);
+      return !isNaN(d) && d.getFullYear() === calY && d.getMonth() === calM;
+    });
+    if(!monthHasEvents && STATE.events.length){
+      const today = new Date(); today.setHours(0,0,0,0);
+      const valid = STATE.events
+        .map(e => new Date(e.date))
+        .filter(d => !isNaN(d.getTime()))
+        .sort((a,b) => a - b);
+      if(valid.length){
+        // Prefer the next upcoming event; if all are past, use the last one
+        const upcoming = valid.find(d => d >= today) || valid[valid.length-1];
+        calY = upcoming.getFullYear();
+        calM = upcoming.getMonth();
+      }
+    }
+  }
+
   renderActiveView();
 }
 
@@ -3993,6 +4130,7 @@ setInterval(() => {
 let calY = new Date().getFullYear(), calM = new Date().getMonth();
 
 function renderCalendar(){
+  healSubjectLinks();
   const today = new Date(); today.setHours(0,0,0,0);
   document.getElementById('cal-title').textContent = `${MONTHS_ES[calM]} ${calY}`;
   const first = new Date(calY, calM, 1);
@@ -4245,19 +4383,38 @@ function getStepsForDate(ds){
 function renderGantt(){
   const evs = filteredEvents();
   if(!evs.length){
+    const filterNote = selectedSubjId
+      ? `<div class="gantt-empty-sub">tienes filtrada la asignatura "<strong>${getSub(selectedSubjId)?.name || selectedSubjId}</strong>" y no tiene eventos.<br>quita el filtro tocando "todas" en el panel de asignaturas.</div>`
+      : (STATE.events.length
+          ? `<div class="gantt-empty-sub">hay eventos pero no se pudieron vincular.<br>recarga la página o pídele a la ia que reorganice tu plan.</div>`
+          : `<div class="gantt-empty-sub">habla con la ia para configurar tu cuatrimestre<br>y ver el gantt completo con fases y hitos.</div>`);
     document.getElementById('gantt-wrap').innerHTML = `
       <div class="gantt-empty-state">
         <div class="gantt-empty-inner">
           <div class="gantt-empty-icon">▦</div>
           <div class="gantt-empty-title">sin datos todavía</div>
-          <div class="gantt-empty-sub">habla con la ia para configurar tu cuatrimestre<br>y ver el gantt completo con fases y hitos.</div>
+          ${filterNote}
         </div>
       </div>`;
     document.getElementById('gantt-legend').innerHTML = '';
     return;
   }
 
-  const dates = evs.map(e => new Date(e.date));
+  // Only use valid dates for the range; ignore malformed ones to avoid NaN ranges
+  const validDates = evs.map(e => new Date(e.date)).filter(d => !isNaN(d.getTime()));
+  if(!validDates.length){
+    document.getElementById('gantt-wrap').innerHTML = `
+      <div class="gantt-empty-state">
+        <div class="gantt-empty-inner">
+          <div class="gantt-empty-icon">▦</div>
+          <div class="gantt-empty-title">sin fechas válidas</div>
+          <div class="gantt-empty-sub">los eventos no tienen fechas reconocibles.<br>revísalos o pídele a la ia que los reorganice.</div>
+        </div>
+      </div>`;
+    document.getElementById('gantt-legend').innerHTML = '';
+    return;
+  }
+  const dates = validDates;
   const SEM_START = new Date(Math.min(...dates)); SEM_START.setDate(1);
   const SEM_END = new Date(Math.max(...dates)); SEM_END.setDate(SEM_END.getDate() + 14);
   const WW = 44, LW = 130;
@@ -4277,6 +4434,9 @@ function renderGantt(){
     <div class="gantt-legend-item"><div style="width:1px;height:13px;background:rgba(196,56,56,.6)"></div> hoy</div>`;
 
   const visibleSubjs = selectedSubjId ? STATE.subjects.filter(s => s.id === selectedSubjId) : STATE.subjects;
+  // Run a heal pass so events with slightly-off subject ids get relinked first
+  healSubjectLinks();
+
   const ROW_H_SUBJ = 34, ROW_H_PHASE = 24, ROW_SPACER = 6;
 
   let rows = [];
@@ -4290,6 +4450,24 @@ function renderGantt(){
       [{task:'investigación y conceptos'},{task:'desarrollo y producción'},{task:'acabado y presentación'}];
     rows.push({sub, subjEvs, phases, isAI: subjSessions.length > 0});
   });
+
+  // Catch-all: any events whose subject isn't in visibleSubjs (orphans) still get shown,
+  // grouped under a generic row, so the gantt is never mysteriously empty.
+  if(!selectedSubjId){
+    const shownEventDates = new Set(rows.flatMap(r => r.subjEvs.map(e => e.date + '|' + e.title)));
+    const orphanEvs = evs.filter(e => {
+      const inRow = rows.some(r => r.subjEvs.includes(e));
+      return !inRow;
+    }).sort((a,b) => new Date(a.date) - new Date(b.date));
+    if(orphanEvs.length){
+      rows.push({
+        sub: {id:'__orphan__', name:'otras tareas', color:'#8E8E8E'},
+        subjEvs: orphanEvs,
+        phases: [],
+        isAI: false
+      });
+    }
+  }
 
   let totalH = 0;
   rows.forEach(r => { totalH += ROW_H_SUBJ + r.phases.length*ROW_H_PHASE + ROW_SPACER; });
@@ -4894,18 +5072,80 @@ function processFiles(files){
   const ok = ['application/pdf','image/jpeg','image/jpg','image/png'];
   files.forEach(f => {
     if(!ok.includes(f.type)){ showToast(`formato no soportado: ${f.name}`); return; }
-    if(f.size > 10*1024*1024){ showToast(`${f.name} > 10mb`); return; }
-    const r = new FileReader();
-    r.onload = ev => {
-      pendingFiles.push({
-        name: f.name, mediaType: f.type,
-        base64: ev.target.result.split(',')[1],
-        isDoc: f.type === 'application/pdf'
-      });
-      renderChips();
-    };
-    r.readAsDataURL(f);
+    if(f.size > 20*1024*1024){ showToast(`${f.name} supera 20mb`); return; }
+
+    if(f.type === 'application/pdf'){
+      // Extract text from the PDF in the browser. This keeps the payload light
+      // (plain text instead of multi-MB base64) so the IA responds without timing out.
+      extractPdfText(f);
+    } else {
+      // Images go as base64 (the model needs to see them)
+      const r = new FileReader();
+      r.onload = ev => {
+        pendingFiles.push({
+          name: f.name, mediaType: f.type,
+          base64: ev.target.result.split(',')[1],
+          isDoc: false
+        });
+        renderChips();
+      };
+      r.readAsDataURL(f);
+    }
   });
+}
+
+async function extractPdfText(f){
+  // Show a temporary "processing" chip
+  const placeholderId = 'pdf-' + Date.now();
+  pendingFiles.push({name: f.name, isDoc: true, processing: true, _id: placeholderId, extractedText: ''});
+  renderChips();
+
+  try{
+    if(!window.pdfjsLib){
+      // PDF.js not loaded yet — wait briefly
+      await new Promise(r => setTimeout(r, 600));
+    }
+    if(!window.pdfjsLib) throw new Error('pdfjs not loaded');
+
+    const arrayBuffer = await f.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({data: arrayBuffer}).promise;
+    let fullText = '';
+    const maxPages = Math.min(pdf.numPages, 40); // safety cap
+    for(let p = 1; p <= maxPages; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(it => it.str).join(' ');
+      fullText += `\n--- página ${p} ---\n${pageText}`;
+    }
+    fullText = fullText.trim();
+
+    const entry = pendingFiles.find(x => x._id === placeholderId);
+    if(entry){
+      entry.processing = false;
+      if(fullText.length < 20){
+        // Likely a scanned/image PDF with no extractable text — fall back to base64 image-style
+        entry.extractedText = '';
+        entry.scanned = true;
+        // Re-read as base64 so the model can at least OCR visually (first page only via image not feasible here)
+        // We keep it as a doc with a note.
+        entry.extractedText = '[el pdf no contiene texto seleccionable — puede ser escaneado. el estudiante debería describir su contenido o subir una foto de las páginas relevantes]';
+        showToast(`${f.name}: pdf sin texto seleccionable`);
+      } else {
+        entry.extractedText = fullText;
+        showToast(`${f.name}: ${maxPages} pág. leídas`);
+      }
+    }
+    renderChips();
+  }catch(err){
+    console.error('PDF extraction failed:', err);
+    const entry = pendingFiles.find(x => x._id === placeholderId);
+    if(entry){
+      entry.processing = false;
+      entry.error = true;
+      showToast(`no pude leer ${f.name}`);
+    }
+    renderChips();
+  }
 }
 
 function removeFile(i){ pendingFiles.splice(i, 1); renderChips(); }
@@ -4952,12 +5192,20 @@ function renderChips(){
     return;
   }
   upload.classList.add('has-files');
-  el.innerHTML = pendingFiles.map((f, i) => `
-    <div class="file-chip ${f.isDoc?'chip-type-pdf':'chip-type-img'}">
-      <span class="chip-icon">${f.isDoc?'📄':'🖼'}</span>
-      <span class="chip-name" title="${f.name}">${f.name}</span>
+  el.innerHTML = pendingFiles.map((f, i) => {
+    let icon = f.isDoc ? '📄' : '🖼';
+    let statusClass = f.isDoc ? 'chip-type-pdf' : 'chip-type-img';
+    let extra = '';
+    if(f.processing){ icon = '⏳'; extra = ' · leyendo…'; statusClass += ' chip-processing'; }
+    else if(f.error){ icon = '⚠'; extra = ' · error'; }
+    else if(f.scanned){ icon = '📄'; extra = ' · sin texto'; }
+    return `
+    <div class="file-chip ${statusClass}">
+      <span class="chip-icon">${icon}</span>
+      <span class="chip-name" title="${f.name}">${f.name}${extra}</span>
       <button class="chip-remove" onclick="removeFile(${i})">×</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════
@@ -5000,7 +5248,9 @@ CAPACIDADES:
 6. extraer los pesos de evaluación (%) del plan docente si el estudiante lo sube
 
 ⚠️ EXTRACCIÓN EXPERTA DE DOCUMENTOS E IMÁGENES:
-cuando el estudiante adjunte un PDF (plan docente, guía de la asignatura, calendario académico, syllabus) o una imagen (foto del horario, captura del campus virtual, pizarra con fechas, tabla de evaluación), tu trabajo es LEERLO COMPLETO y volcar TODA la información útil a la estructura de plan. actúa como un planificador experto que no deja escapar ningún dato:
+cuando el estudiante adjunte un PDF o una imagen, tu trabajo es LEERLO COMPLETO y volcar TODA la información útil a la estructura de plan. actúa como un planificador experto que no deja escapar ningún dato.
+
+NOTA TÉCNICA: el texto de los PDF llega ya extraído dentro del mensaje, delimitado por "=== contenido del pdf ... ===" y "=== fin del pdf ===". léelo entero. las imágenes (fotos de horarios, capturas, pizarras) las ves directamente. si un pdf llega marcado como "sin texto seleccionable", pídele al estudiante una foto de las páginas con el calendario o la evaluación.
 
 QUÉ BUSCAR Y EXTRAER:
 - NOMBRE de la asignatura → créala en subjects si no existe
@@ -5119,16 +5369,31 @@ async function sendMsg(){
   const txt = inp.value.trim();
   const hasFiles = pendingFiles.length > 0;
   if(!txt && !hasFiles) return;
+
+  // Don't send while a PDF is still being read
+  if(pendingFiles.some(f => f.processing)){
+    showToast('espera, todavía estoy leyendo el pdf…');
+    return;
+  }
+
   inp.value = '';
   inp.style.height = 'auto';
   openIaCmd();
 
   const blocks = [];
+  let pdfTextBundle = '';
   pendingFiles.forEach(f => {
-    if(f.isDoc) blocks.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:f.base64}});
-    else blocks.push({type:'image', source:{type:'base64', media_type:f.mediaType, data:f.base64}});
+    if(f.isDoc){
+      // PDF text was extracted in the browser — send it as text, not heavy base64
+      pdfTextBundle += `\n\n=== contenido del pdf "${f.name}" ===\n${f.extractedText || '(sin texto)'}\n=== fin del pdf ===`;
+    } else {
+      // Images still go as base64 so the model can see them
+      blocks.push({type:'image', source:{type:'base64', media_type:f.mediaType, data:f.base64}});
+    }
   });
-  const msgText = txt || (hasFiles ? 'analiza estos archivos y configura mi plan' : '');
+
+  const baseText = txt || (hasFiles ? 'analiza estos archivos y configura mi plan' : '');
+  const msgText = baseText + pdfTextBundle;
   blocks.push({type:'text', text:msgText});
 
   const fileNames = pendingFiles.map(f => f.name).join(', ');
@@ -5138,9 +5403,8 @@ async function sendMsg(){
 
   pendingFiles = []; renderChips();
 
-  // Store the FULL message (with file blocks) in the in-memory conversation so the
-  // IA keeps seeing the files and everything for the active session. Persistence to
-  // localStorage strips heavy base64 (see saveState) but in-memory keeps it this session.
+  // Store the message in the in-memory conversation. PDF content is now plain text
+  // (lightweight), so it persists fine and the IA keeps full context all session.
   STATE.iaMessages.push({role:'user', content:blocks, displayText: bubbleTxt, hadFiles: hasFiles});
   saveState();
   addBubble('user', bubbleTxt);
@@ -5178,9 +5442,14 @@ async function sendMsg(){
     }
     if(res.status === 500 || res.status === 502 || res.status === 504){
       typing.remove();
-      const msg = res.status === 504
-        ? 'la respuesta tardo demasiado. intentalo de nuevo; si subiste un pdf muy grande, prueba con uno mas ligero o preguntame por partes.'
-        : 'error del servidor. lo mas probable es que falte la variable `ANTHROPIC_API_KEY` en netlify, o que la clave este mal. revisalo en site settings -> environment variables.';
+      // 502/504 with files attached almost always means a processing timeout, not a key issue.
+      const sentFiles = STATE.iaMessages.some(m => m.hadFiles);
+      let msg;
+      if(res.status === 504 || (res.status === 502 && sentFiles)){
+        msg = 'la lectura del archivo tardó demasiado y el servidor cortó la conexión. esto pasa con pdf pesados o de muchas páginas. prueba: 1) sube una versión más ligera o solo las páginas con el calendario/evaluación, o 2) cuéntame los datos por texto y los organizo igual de bien.';
+      } else {
+        msg = 'error del servidor. si es la primera vez que usas la ia, revisa que la variable `ANTHROPIC_API_KEY` esté configurada en netlify (site settings → environment variables). si ya te funcionaba antes, probablemente sea un timeout temporal: inténtalo de nuevo.';
+      }
       addBubble('assistant', msg);
       STATE.iaMessages.pop();
       saveState();
