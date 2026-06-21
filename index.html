@@ -5442,7 +5442,7 @@ async function sendMsg(){
 
   try{
     const apiMessages = STATE.iaMessages.map(m => ({role: m.role, content: m.content}));
-    const res = await fetch('/.netlify/functions/claude', {
+    const res = await fetch('/api/claude', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -5458,7 +5458,7 @@ async function sendMsg(){
       const isLocal = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
       const msg = isLocal
         ? 'la funcion ia no esta disponible en local. necesitas desplegar en netlify (o usar `netlify dev`) para que funcione.'
-        : 'la funcion serverless no se encuentra (404). asegurate de que la carpeta `netlify/functions/` se subio al repositorio.';
+        : 'la funcion ia no se encuentra (404). asegurate de haber subido el archivo `netlify/edge-functions/claude.js` al repositorio.';
       addBubble('assistant', msg);
       STATE.iaMessages.pop();
       saveState();
