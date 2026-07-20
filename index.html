@@ -2087,6 +2087,7 @@ function saveState(){
     }catch(e){
       console.error('Save failed:', e);
     }
+    saveTimer = null;
   }, 200);
 }
 
@@ -2111,6 +2112,19 @@ function loadState(){
     return false;
   }
 }
+
+// ─── SINCRONIZACIÓN ENTRE PESTAÑAS DEL NAVEGADOR ───
+// si el plan cambia en otra pestaña, esta se actualiza sola al momento.
+// si aquí hay un guardado pendiente (edición local en curso), gana lo local.
+window.addEventListener('storage', (e) => {
+  if(e.key !== STORAGE_KEY || e.newValue === null) return;
+  if(saveTimer) return;
+  if(loadState()){
+    renderAll();
+    initIaWelcome();
+    renderChangelog();
+  }
+});
 
 // ═══════════════════════════════════════════
 // EXPORT — modal with scope + format selection
@@ -3371,8 +3385,7 @@ function resetTrackedTime(){
   STATE.subjects.forEach(s => { s.weeklyTracked = 0; });
   STATE.trackedWeek = getWeekKey(new Date());
   saveState();
-  renderSidebar();
-  renderTrackedList();
+  renderAll();
   showToast('tiempo de la semana reiniciado');
 }
 
@@ -3566,9 +3579,7 @@ function saveJournal(skip){
   finishSession();
   closeModalForce('modal-journal');
   saveState();
-  renderSidebar();
-  renderSessionLog();
-  if(document.getElementById('view-hoy').classList.contains('active')) renderHoy();
+  renderAll();
 }
 
 function finishSession(){
@@ -3650,6 +3661,7 @@ function renderAll(){
   renderDeadline();
   startCountdown();
   renderSessionLog();
+  renderTrackedList();
   renderActiveView();
 }
 
@@ -3821,23 +3833,16 @@ function renderHoy(){
 function toggleEventDone(idx){
   if(idx < 0) return;
   STATE.events[idx].done = !STATE.events[idx].done;
-  saveState();
-  renderHoy();
-  renderDeadline();
-  startCountdown();
-  if(document.getElementById('view-month').classList.contains('active')) renderCalendar();
-  if(document.getElementById('view-week').classList.contains('active')) renderWeek();
-  // Update progress
   updateProgressFromCompletion();
-  renderSidebar();
+  saveState();
+  renderAll();
 }
 
 function toggleScheduleDone(idx){
   if(idx < 0) return;
   STATE.schedule[idx].done = !STATE.schedule[idx].done;
   saveState();
-  renderHoy();
-  if(document.getElementById('view-week').classList.contains('active')) renderWeek();
+  renderAll();
 }
 
 function toggleStepDone(key){
@@ -3845,7 +3850,7 @@ function toggleStepDone(key){
   if(!STATE.weeklyPlan.stepDone) STATE.weeklyPlan.stepDone = {};
   STATE.weeklyPlan.stepDone[key] = !STATE.weeklyPlan.stepDone[key];
   saveState();
-  renderHoy();
+  renderAll();
 }
 
 function updateProgressFromCompletion(){
@@ -4124,7 +4129,7 @@ function onDragPointerDown(e){
       }
     }
     dragState = null;
-    renderWeek();
+    renderAll();
   };
 
   document.addEventListener('pointermove', onMove);
@@ -4175,7 +4180,7 @@ function onResizePointerDown(e){
       saveState();
       showToast(`${b.title} · ${b.endH - b.startH}h`);
     }
-    renderWeek();
+    renderAll();
   };
 
   document.addEventListener('pointermove', onMove);
@@ -5113,7 +5118,7 @@ function saveNote(){
   }
   saveState();
   closeModalForce('modal-note');
-  renderActiveView();
+  renderAll();
   showToast(text ? 'nota guardada' : 'nota eliminada');
 }
 
@@ -5122,7 +5127,7 @@ function deleteNote(){
   delete STATE.notes[editingNoteKey];
   saveState();
   closeModalForce('modal-note');
-  renderActiveView();
+  renderAll();
   showToast('nota eliminada');
 }
 
