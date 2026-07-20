@@ -4,8 +4,10 @@ Esta carpeta contiene los recursos del modo ambiente (video lofi de fondo + post
 
 ## archivos
 
+> estado actual: el `lofi.mp4` publicado en la release v1.0.0 pesa ~279 MB, por encima del objetivo de 50-150 MB. cuando puedas, re-encódalo con la receta de optimización de abajo y publícalo como asset nuevo.
+
 - `lofi.mp4` — video que se reproduce en bucle como fondo del modo ambiente. Recomendado: H.264, 1080p, 1-2 Mbps, **sin audio**, duración 10-15 min en bucle suave. Tamaño objetivo: ~50-150 MB.
-- `lofi-poster.jpg` — primera frame del video. Se usa cuando el usuario tiene `prefers-reduced-motion` activado o cuando el video aún no se ha cargado. JPG 1920×1080, 80% calidad, ~200-400 KB.
+- `lofi-poster.png` — primera frame del video. Se usa cuando el usuario tiene `prefers-reduced-motion` activado o cuando el video aún no se ha cargado. JPG 1920×1080, 80% calidad, ~200-400 KB.
 
 ## cómo cambiar el video
 
@@ -15,8 +17,8 @@ Como Netlify cachea estos archivos durante 30 días, si subes un archivo con el 
 
 1. Sube el video nuevo como `lofi-v2.mp4` (luego `lofi-v3.mp4`, etc).
 2. En `index.html`, busca la línea `const AMBIENT_VIDEO = 'ambient/lofi.mp4'` y cámbiala a `'ambient/lofi-v2.mp4'`.
-3. Genera el nuevo poster con: `ffmpeg -i lofi-v2.mp4 -ss 00:00:05 -vframes 1 lofi-poster-v2.jpg`
-4. Cambia también `const AMBIENT_POSTER = 'ambient/lofi-poster.jpg'` a la versión nueva.
+3. Genera el nuevo poster con: `ffmpeg -i lofi-v2.mp4 -ss 00:00:05 -vframes 1 lofi-poster-v2.png`
+4. Cambia también `const AMBIENT_POSTER = 'ambient/lofi-poster.png'` a la versión nueva.
 5. Push a GitHub → Netlify auto-deploya.
 
 ### opción b — sustituir el archivo
@@ -30,7 +32,7 @@ Como Netlify cachea estos archivos durante 30 días, si subes un archivo con el 
 Si tienes `ffmpeg` instalado:
 
 ```bash
-ffmpeg -i lofi.mp4 -ss 00:00:05 -vframes 1 -q:v 2 lofi-poster.jpg
+ffmpeg -i lofi.mp4 -ss 00:00:05 -vframes 1 -q:v 2 lofi-poster.png
 ```
 
 `-ss 00:00:05` toma el frame del segundo 5 (suele ser más interesante que el frame 0).

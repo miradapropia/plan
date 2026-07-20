@@ -54,7 +54,7 @@ git push -u origin main
 3. Configuración de build:
    - **Build command:** *(dejar vacío)*
    - **Publish directory:** `.`
-   - **Functions directory:** `netlify/functions` *(autodetectado por `netlify.toml`)*
+   - **Functions:** la Edge Function de `netlify/edge-functions/` se autodetecta sola; no hay build
 4. *Deploy site*
 
 #### 3. Configurar la API key
@@ -87,9 +87,11 @@ plan-miradapropia/
 ├── favicon.png                 ← Icono del navegador
 ├── og-image.png                ← Imagen para social sharing (1200×630)
 ├── README.md                   ← Este archivo
+├── ambient/
+│   └── lofi-poster.png         ← poster del modo ambiente (el video vive en GitHub Releases)
 └── netlify/
-    └── functions/
-        └── claude.js           ← Proxy serverless para la API de Anthropic
+    └── edge-functions/
+        └── claude.js           ← Edge Function: proxy con streaming a la API (ruta /api/claude)
 ```
 
 ---
@@ -120,7 +122,7 @@ plan-miradapropia/
 
 ### Cambiar el modelo de IA
 
-En `index.html`, busca `claude-sonnet-4-6` y reemplaza por el modelo deseado:
+El modelo se fija en DOS sitios que deben coincidir: `index.html` (busca `claude-sonnet-4-6`) y `netlify/edge-functions/claude.js` (constante `MODEL`). Por protección de costes, el servidor ignora el modelo que pida el cliente y usa siempre el de la Edge Function. Opciones:
 
 - `claude-sonnet-4-6` — actual (recomendado: equilibrio coste/calidad)
 - `claude-opus-4-7` — más capaz, más caro
@@ -152,7 +154,7 @@ O desde la app: botón **datos → borrar todo**.
 La función serverless no se encuentra. Puede deberse a:
 
 - **Estás abriendo el `index.html` directamente desde el disco** — la IA solo funciona cuando se sirve a través de Netlify (o `netlify dev` en local). Funcionalidades como el calendario, notas, temporizador, exportación, etc. funcionan offline.
-- **La carpeta `netlify/functions/` no se subió al repositorio** — verifica que esté en GitHub.
+- **La carpeta `netlify/edge-functions/` no se subió al repositorio** — verifica que esté en GitHub.
 - **El despliegue no detectó la función** — en el dashboard de Netlify, ve a *Functions* y comprueba que `claude` aparece en la lista.
 
 ### Error 500 / "ANTHROPIC_API_KEY no está configurada"
@@ -191,7 +193,7 @@ Este error viene de **una extensión del navegador** (típicamente un bloqueador
 
 ## Privacidad
 
-- **Tus datos nunca salen de tu navegador** salvo cuando hablas con la IA, donde el contenido del mensaje (no el state completo) se envía a Anthropic vía la función serverless
+- **Tus datos nunca salen de tu navegador** salvo cuando hablas con la IA: en ese caso se envían a Anthropic, vía la Edge Function, tu mensaje, los archivos adjuntos y un resumen del plan (asignaturas, medias, nota objetivo y horas registradas), solo para generar la respuesta
 - **No hay tracking** — sin Google Analytics, sin cookies, sin pixels
 - **No hay cuentas** — la app es funcional sin registro
 - **No hay servidor de datos** — los datos están solo en tu navegador

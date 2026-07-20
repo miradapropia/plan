@@ -1231,7 +1231,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
   .ambient-video{display:none}
   .ambient-bg{background:linear-gradient(135deg,#1a1a18 0%,#0f0f0e 100%)}
   .ambient-bg::before{content:'';position:absolute;inset:0;
-    background-image:url('ambient/lofi-poster.jpg');background-size:cover;background-position:center;background-color:#0a0a0a}
+    background-image:url('ambient/lofi-poster.png');background-size:cover;background-position:center;background-color:#0a0a0a}
 }
 
 </style>
@@ -1259,7 +1259,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
 <div class="ambient-bg" id="ambient-bg" aria-hidden="true">
   <video class="ambient-video" id="ambient-video"
     muted loop playsinline preload="none"
-    poster="ambient/lofi-poster.jpg">
+    poster="ambient/lofi-poster.png">
   </video>
   <div class="ambient-scrim"></div>
 </div>
@@ -1315,6 +1315,34 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-privacy" onclick="closeModal(event,'modal-privacy')">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">privacidad</div>
+      <button class="modal-close" onclick="closeModalForce('modal-privacy')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;line-height:1.7;color:var(--g600);margin-bottom:10px">
+        tu plan (asignaturas, eventos, horario, notas y sesiones) se guarda solo en el almacenamiento local de tu navegador. no hay cuentas, ni servidor de datos, ni analítica, ni cookies de seguimiento.
+      </p>
+      <p style="font-size:12px;line-height:1.7;color:var(--g600);margin-bottom:10px">
+        cuando usas el panel de ia, se envía a anthropic (el proveedor del modelo, a través de nuestro servidor) lo necesario para responder: tu mensaje, los archivos que adjuntes y un resumen de tu plan (asignaturas, medias, nota objetivo y horas registradas). se usa solo para generar la respuesta; no lo almacenamos en ningún servidor propio.
+      </p>
+      <p style="font-size:12px;line-height:1.7;color:var(--g600);margin-bottom:10px">
+        si borras los datos del navegador o cambias de dispositivo, el plan se pierde: haz copias con datos → exportar.
+      </p>
+      <p style="font-size:12px;line-height:1.7;color:var(--g600)">
+        más detalle en la <a href="https://miradapropia.org/politica-de-privacidad-miradapropia/" target="_blank" style="color:var(--black)">política de privacidad de miradapropia</a>.
+      </p>
+    </div>
+    <div class="modal-foot">
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="modal-btn" onclick="closeModalForce('modal-privacy')">cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="app">
 <div class="toast" id="toast"></div>
 
@@ -1340,6 +1368,9 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
         <span>↑</span> importar copia
         <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
       </div>
+      <div class="menu-item" onclick="openPrivacy()">
+        <span>◇</span> privacidad
+      </div>
       <div class="menu-divider"></div>
       <div class="menu-item danger" onclick="confirmReset()">
         <span>⊘</span> borrar todo
@@ -1361,6 +1392,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
       <div class="sb-label">miradapropia</div>
       <a href="https://gu-ia.miradapropia.org" class="sb-link" target="_blank">guIA ↗</a>
       <a href="https://miradapropia.org/recursos-estudiantes-arquitectura/" class="sb-link" target="_blank">taller ↗</a>
+      <a href="https://newsletter.miradapropia.org/" class="sb-link" target="_blank">newsletter ↗</a>
     </div>
     <div class="sb-section" style="flex:1">
       <div class="sb-label" style="display:flex;justify-content:space-between;align-items:center;padding-right:13px">
@@ -1538,6 +1570,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
         <span>planificar con ia</span>
         <span class="ia-cmd-status" id="ia-status">listo</span>
       </div>
+      <button class="ia-changelog-clear" onclick="clearIaChat()" style="margin-right:6px" title="empezar de cero · tu plan no se toca">nueva conversación</button>
       <button class="ia-cmd-close" onclick="closeIaCmd()" title="cerrar">✕</button>
     </div>
     <div class="ia-cmd-msgs" id="ia-msgs"></div>
@@ -1956,12 +1989,32 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
 // STATE
 // ═══════════════════════════════════════════
 const STORAGE_KEY = 'plan_miradapropia';
+
+// ─── FECHAS EN HORA LOCAL (regla del playbook) ──────
+// NUNCA toISOString().split('T')[0] para claves de día: convierte a UTC y
+// desfasa el día entre las 00:00 y las 02:00 hora peninsular.
+function fmtDate(d){
+  const x = (d instanceof Date) ? d : parseDate(d);
+  return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0');
+}
+// parsea 'YYYY-MM-DD' como fecha LOCAL (new Date('YYYY-MM-DD') la interpreta
+// como UTC y resta un día en zonas UTC-, p. ej. latam). acepta Date y timestamps.
+function parseDate(x){
+  if(x instanceof Date) return new Date(x.getTime());
+  if(typeof x === 'string'){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(x.trim());
+    if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  }
+  return new Date(x);
+}
+const IA_HISTORY_LIMIT = 12; // mensajes de conversación enviados a la ia por turno
 const SUBJECT_COLORS = [
   '#2D5A8E','#8B4513','#4A6741','#C17817','#6B5B95',
   '#4A7C7E','#8E4162','#5C5C5C','#3D6B4F','#7A4419'
 ];
 
 const DEFAULT_STATE = () => ({
+  v: 1, // versión del esquema de datos (para migraciones futuras)
   subjects: [],
   events: [],
   schedule: [],
@@ -1982,12 +2035,12 @@ let pendingFiles = [];
 let pendingConfirmation = null; // {description, action}
 
 function getWeekKey(d){
-  const date = new Date(d);
+  const date = parseDate(d);
   const dow = date.getDay();
-  const monday = new Date(date);
+  const monday = parseDate(date);
   monday.setDate(date.getDate() - (dow === 0 ? 6 : dow - 1));
   monday.setHours(0,0,0,0);
-  return monday.toISOString().split('T')[0];
+  return fmtDate(monday);
 }
 
 // ═══════════════════════════════════════════
@@ -2085,7 +2138,7 @@ function doExport(){
 // Scope helpers — return {events, schedule, dateRange:{from,to}, label}
 function getScopeData(scope){
   const today = new Date(); today.setHours(0,0,0,0);
-  const ds = today.toISOString().split('T')[0];
+  const ds = fmtDate(today);
 
   if(scope === 'today'){
     const dayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
@@ -2099,10 +2152,10 @@ function getScopeData(scope){
   }
   if(scope === 'week'){
     const dow = today.getDay();
-    const monday = new Date(today);
+    const monday = parseDate(today);
     monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
-    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-    const dates = []; for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(monday.getDate()+i);dates.push(d.toISOString().split('T')[0]);}
+    const sunday = parseDate(monday); sunday.setDate(monday.getDate() + 6);
+    const dates = []; for(let i=0;i<7;i++){const d=parseDate(monday);d.setDate(monday.getDate()+i);dates.push(fmtDate(d));}
     return {
       events: STATE.events.filter(e => dates.includes(e.date)),
       schedule: STATE.schedule,
@@ -2116,7 +2169,7 @@ function getScopeData(scope){
     const last = new Date(today.getFullYear(), today.getMonth()+1, 0);
     return {
       events: STATE.events.filter(e => {
-        const d = new Date(e.date);
+        const d = parseDate(e.date);
         return d >= first && d <= last;
       }),
       schedule: STATE.schedule,
@@ -2162,7 +2215,7 @@ function exportAsJSON(scope){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `plan-${scope}-${new Date().toISOString().split('T')[0]}.json`;
+  a.download = `plan-${scope}-${fmtDate(new Date())}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('json descargado');
@@ -2172,8 +2225,8 @@ function exportAsJSON(scope){
 function exportAsICS(scope){
   const data = getScopeData(scope);
   const fmt = (d, allDay = false) => {
-    if(typeof d === 'string') d = new Date(d);
-    if(allDay) return d.toISOString().split('T')[0].replace(/-/g,'');
+    if(typeof d === 'string') d = parseDate(d);
+    if(allDay) return fmtDate(d).replace(/-/g,'');
     return d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
   };
   const escape = s => (s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
@@ -2183,12 +2236,12 @@ function exportAsICS(scope){
   // Events (entregas, exámenes)
   data.events.forEach((ev, i) => {
     const sub = getSub(ev.subj);
-    const summary = `${ev.type === 'examen' ? '📝 ' : '📌 '}${ev.title} · ${sub?.name || ev.subj}`;
+    const summary = `${ev.type === 'examen' ? '✎ ' : '⬡ '}${ev.title} · ${sub?.name || ev.subj}`;
     ics.push('BEGIN:VEVENT');
     ics.push(`UID:plan-ev-${i}-${ev.date}@miradapropia.org`);
     ics.push(`DTSTAMP:${fmt(new Date())}`);
     ics.push(`DTSTART;VALUE=DATE:${fmt(ev.date, true)}`);
-    const next = new Date(ev.date); next.setDate(next.getDate()+1);
+    const next = parseDate(ev.date); next.setDate(next.getDate()+1);
     ics.push(`DTEND;VALUE=DATE:${fmt(next, true)}`);
     ics.push(`SUMMARY:${escape(summary)}`);
     if(ev.done) ics.push('STATUS:CONFIRMED');
@@ -2199,21 +2252,21 @@ function exportAsICS(scope){
   if(scope === 'week' || scope === 'today' || scope === 'month'){
     const fromDate = data.from || new Date();
     const toDate = data.to || new Date();
-    let cursor = new Date(fromDate);
+    let cursor = parseDate(fromDate);
     let safety = 0;
     while(cursor <= toDate && safety < 400){
       const dayIdx = cursor.getDay() === 0 ? 6 : cursor.getDay() - 1;
       const blocks = data.schedule.filter(s => s.day === dayIdx);
       blocks.forEach((b, bi) => {
         const sub = getSub(b.subj);
-        const start = new Date(cursor); start.setHours(b.startH, 0, 0);
-        const end = new Date(cursor); end.setHours(b.endH, 0, 0);
+        const start = parseDate(cursor); start.setHours(b.startH, 0, 0);
+        const end = parseDate(cursor); end.setHours(b.endH, 0, 0);
         ics.push('BEGIN:VEVENT');
-        ics.push(`UID:plan-sch-${cursor.toISOString().split('T')[0]}-${bi}@miradapropia.org`);
+        ics.push(`UID:plan-sch-${fmtDate(cursor)}-${bi}@miradapropia.org`);
         ics.push(`DTSTAMP:${fmt(new Date())}`);
         ics.push(`DTSTART:${fmt(start)}`);
         ics.push(`DTEND:${fmt(end)}`);
-        ics.push(`SUMMARY:${escape((b.type === 'clase' ? '🎓 ' : b.type === 'estudio' ? '📖 ' : '✏️ ') + b.title + ' · ' + (sub?.name||b.subj))}`);
+        ics.push(`SUMMARY:${escape((b.type === 'clase' ? '▣ ' : b.type === 'estudio' ? '▧ ' : '✎ ') + b.title + ' · ' + (sub?.name||b.subj))}`);
         ics.push('END:VEVENT');
       });
       cursor.setDate(cursor.getDate() + 1);
@@ -2226,7 +2279,7 @@ function exportAsICS(scope){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `plan-${scope}-${new Date().toISOString().split('T')[0]}.ics`;
+  a.download = `plan-${scope}-${fmtDate(new Date())}.ics`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('ics descargado · ábrelo en tu calendario');
@@ -2286,16 +2339,16 @@ function buildPDFHTML(scope, data){
       body += `</table>`;
     }
     // Note for today
-    const ds = today.toISOString().split('T')[0];
+    const ds = fmtDate(today);
     if(STATE.notes[ds]) body += `<div class="note"><strong>nota:</strong> ${STATE.notes[ds]}</div>`;
   }
 
   if(scope === 'week'){
     body += `<h2>semana ${data.label}</h2>`;
     body += `<table class="week-tbl"><thead><tr><th class="hour-col">hora</th>`;
-    const dates = []; const cur = new Date(data.from);
+    const dates = []; const cur = parseDate(data.from);
     for(let i=0;i<7;i++){
-      const d = new Date(cur); d.setDate(cur.getDate()+i);
+      const d = parseDate(cur); d.setDate(cur.getDate()+i);
       dates.push(d);
       body += `<th>${DLBLS[i]} ${d.getDate()}</th>`;
     }
@@ -2324,9 +2377,9 @@ function buildPDFHTML(scope, data){
     // Events of the week
     if(data.events.length){
       body += `<h3>eventos esta semana</h3><ul class="ev-list">`;
-      data.events.sort((a,b) => new Date(a.date)-new Date(b.date)).forEach(e => {
+      data.events.sort((a,b) => parseDate(a.date)-parseDate(b.date)).forEach(e => {
         const sub = subjMap[e.subj];
-        const d = new Date(e.date);
+        const d = parseDate(e.date);
         const linksHtml = (e.links && e.links.length)
           ? `<div class="ev-extra">enlaces: ${e.links.map(l => l.url).join(' · ')}</div>` : '';
         const notesHtml = (e.notes && e.notes.trim())
@@ -2353,7 +2406,7 @@ function buildPDFHTML(scope, data){
     for(let d=1;d<=last.getDate();d++){
       if(col === 7){ body += `</tr><tr>`; col = 0; }
       const dt = new Date(first.getFullYear(), first.getMonth(), d);
-      const ds = dt.toISOString().split('T')[0];
+      const ds = fmtDate(dt);
       const evs = data.events.filter(e => e.date === ds);
       const note = STATE.notes[ds];
       body += `<td class="${dt.toDateString()===today.toDateString()?'today':''}">
@@ -2373,13 +2426,13 @@ function buildPDFHTML(scope, data){
   if(scope === 'semester' || scope === 'all'){
     body += `<h2>cuatrimestre · ${STATE.subjects.length} asignaturas</h2>`;
     STATE.subjects.forEach(sub => {
-      const subjEvs = data.events.filter(e => e.subj === sub.id).sort((a,b) => new Date(a.date)-new Date(b.date));
+      const subjEvs = data.events.filter(e => e.subj === sub.id).sort((a,b) => parseDate(a.date)-parseDate(b.date));
       body += `<div class="subj-section">
         <h3><span class="dot" style="background:${sub.color}"></span>${sub.name} <span class="sub">(${sub.progress}%)</span></h3>`;
       if(subjEvs.length){
         body += `<ul class="ev-list">`;
         subjEvs.forEach(e => {
-          const d = new Date(e.date);
+          const d = parseDate(e.date);
           const linksHtml = (e.links && e.links.length)
             ? `<div class="ev-extra">enlaces: ${e.links.map(l => l.url).join(' · ')}</div>` : '';
           const notesHtml = (e.notes && e.notes.trim())
@@ -2485,7 +2538,7 @@ function buildPDFHTML(scope, data){
   <div class="header-meta">${data.type} · generado ${today.getDate()}/${today.getMonth()+1}/${today.getFullYear()}</div>
 </div>
 ${body}
-<div class="footer">miradapropia.org · plan</div>
+<div class="footer">plan.miradapropia.org · newsletter semanal para estudiantes de arquitectura: newsletter.miradapropia.org</div>
 </body></html>`;
 }
 
@@ -2510,6 +2563,11 @@ function importData(e){
   };
   reader.readAsText(file);
   e.target.value = '';
+}
+
+function openPrivacy(){
+  closeMenu();
+  document.getElementById('modal-privacy').classList.add('open');
 }
 
 function confirmReset(){
@@ -2956,7 +3014,7 @@ function openSubjectDetail(id){
   // Stats
   const allEvs = STATE.events.filter(e => e.subj === id);
   const subjSchedules = STATE.schedule.filter(s => s.subj === id);
-  const upcoming = allEvs.filter(e => !e.done && new Date(e.date) >= new Date(new Date().setHours(0,0,0,0))).length;
+  const upcoming = allEvs.filter(e => !e.done && parseDate(e.date) >= new Date(new Date().setHours(0,0,0,0))).length;
   const totalMinutes = STATE.sessionLogs.filter(l => l.subjId === id).reduce((acc, l) => acc + l.minutes, 0);
   const totalHours = (totalMinutes / 60).toFixed(1);
   const allLinks = allEvs.flatMap(e => e.links || []).length
@@ -3008,7 +3066,7 @@ function openSubjectDetail(id){
       </div>`;
 
     // List graded items
-    const gradedEvs = getGradedEvents(id).sort((a,b) => new Date(a.date) - new Date(b.date));
+    const gradedEvs = getGradedEvents(id).sort((a,b) => parseDate(a.date) - parseDate(b.date));
     if(gradedEvs.length){
       body += `<div class="grade-list">`;
       gradedEvs.forEach(ev => {
@@ -3074,15 +3132,15 @@ function openSubjectDetail(id){
   }
 
   // 1. UPCOMING EVENTS
-  const upcomingEvs = allEvs.filter(e => !e.done && new Date(e.date) >= today)
-    .sort((a,b) => new Date(a.date) - new Date(b.date));
+  const upcomingEvs = allEvs.filter(e => !e.done && parseDate(e.date) >= today)
+    .sort((a,b) => parseDate(a.date) - parseDate(b.date));
   body += `<div class="subj-detail-section">
     <div class="subj-detail-section-lbl">próximas entregas y exámenes</div>`;
   if(upcomingEvs.length){
     body += `<div class="subj-detail-evlist">`;
     upcomingEvs.forEach(ev => {
       const idx = STATE.events.indexOf(ev);
-      const d = new Date(ev.date);
+      const d = parseDate(ev.date);
       const ms = d.setHours(23,59,59) - Date.now();
       const days = Math.floor(ms/864e5);
       const dayLabel = days === 0 ? 'hoy' : days === 1 ? 'mañana' : `en ${days}d`;
@@ -3095,7 +3153,7 @@ function openSubjectDetail(id){
           <div class="subj-detail-ev-meta">
             <span>${ev.type}</span>
             ${ev.notes ? '<span class="subj-detail-ev-meta-icon">✎</span>' : ''}
-            ${ev.links && ev.links.length ? `<span class="subj-detail-ev-meta-icon">🔗 ${ev.links.length}</span>` : ''}
+            ${ev.links && ev.links.length ? `<span class="subj-detail-ev-meta-icon">↗ ${ev.links.length}</span>` : ''}
           </div>
         </div>
         <div class="subj-detail-tag ${isUrgent?'urgent':''}">${dayLabel}</div>
@@ -3172,7 +3230,7 @@ function openSubjectDetail(id){
     notesEntries.push({type:'session', text:l.note, label:`sesión de ${l.minutes}min`, date:l.date});
   });
   // Sort by date desc
-  notesEntries.sort((a,b) => new Date(b.date) - new Date(a.date));
+  notesEntries.sort((a,b) => parseDate(b.date) - parseDate(a.date));
 
   body += `<div class="subj-detail-section">
     <div class="subj-detail-section-lbl">
@@ -3182,9 +3240,9 @@ function openSubjectDetail(id){
   if(notesEntries.length){
     body += `<div class="subj-detail-note-list">`;
     notesEntries.forEach(n => {
-      const d = new Date(n.date);
+      const d = parseDate(n.date);
       const dateStr = `${d.getDate()}/${d.getMonth()+1}`;
-      const icon = n.type === 'session' ? '⏱' : n.type === 'schedule' ? '📅' : n.type === 'subject' ? '📝' : '📌';
+      const icon = n.type === 'session' ? '⏱' : n.type === 'schedule' ? '▣' : n.type === 'subject' ? '✎' : '⬡';
       const removeBtn = n.type === 'subject'
         ? `<button class="subj-detail-note-remove" onclick="removeSubjectNote('${id}',${n.subjNoteIdx})" title="quitar">×</button>`
         : '';
@@ -3207,14 +3265,14 @@ function openSubjectDetail(id){
     // Group by week
     const byWeek = {};
     sessions.forEach(s => {
-      const wkKey = getWeekKey(new Date(s.date));
+      const wkKey = getWeekKey(parseDate(s.date));
       byWeek[wkKey] = (byWeek[wkKey] || 0) + s.minutes;
     });
-    const sorted = Object.entries(byWeek).sort((a,b) => new Date(b[0]) - new Date(a[0])).slice(0, 8);
+    const sorted = Object.entries(byWeek).sort((a,b) => parseDate(b[0]) - parseDate(a[0])).slice(0, 8);
     const max = Math.max(...sorted.map(([_, m]) => m), 1);
     body += `<div class="subj-detail-time-bars">`;
     sorted.forEach(([wkKey, mins]) => {
-      const d = new Date(wkKey);
+      const d = parseDate(wkKey);
       const lbl = `${d.getDate()} ${MN_SHORT[d.getMonth()]}`;
       const w = (mins/max)*100;
       const h = Math.floor(mins/60), mm = mins%60;
@@ -3234,15 +3292,15 @@ function openSubjectDetail(id){
   body += `</div>`;
 
   // 5. PAST EVENTS (history)
-  const pastEvs = allEvs.filter(e => e.done || new Date(e.date) < today)
-    .sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+  const pastEvs = allEvs.filter(e => e.done || parseDate(e.date) < today)
+    .sort((a,b) => parseDate(b.date) - parseDate(a.date)).slice(0, 10);
   if(pastEvs.length){
     body += `<div class="subj-detail-section">
       <div class="subj-detail-section-lbl">historial</div>
       <div class="subj-detail-evlist">`;
     pastEvs.forEach(ev => {
       const idx = STATE.events.indexOf(ev);
-      const d = new Date(ev.date);
+      const d = parseDate(ev.date);
       const dateStr = `${d.getDate()}/${d.getMonth()+1}`;
       body += `<div class="subj-detail-ev ${ev.done?'done':''}" onclick="closeSubjectDetail();setTimeout(()=>editEvent(${idx}),200)">
         <div class="subj-detail-ev-date">${dateStr}</div>
@@ -3316,8 +3374,8 @@ let countdownTarget = null;
 function renderDeadline(){
   const today = new Date(); today.setHours(0,0,0,0);
   const evs = filteredEvents()
-    .filter(e => !e.done && new Date(e.date) >= today)
-    .sort((a,b) => new Date(a.date) - new Date(b.date));
+    .filter(e => !e.done && parseDate(e.date) >= today)
+    .sort((a,b) => parseDate(a.date) - parseDate(b.date));
   const card = document.getElementById('deadline-card');
   if(!evs.length){
     document.getElementById('dl-subj').textContent = '—';
@@ -3338,7 +3396,7 @@ function renderDeadline(){
 
 function updateCountdown(){
   if(!countdownTarget) return;
-  const ms = new Date(countdownTarget).setHours(23,59,59) - Date.now();
+  const ms = parseDate(countdownTarget).setHours(23,59,59) - Date.now();
   const big = document.getElementById('dl-countdown-big');
   const small = document.getElementById('dl-countdown-small');
   const card = document.getElementById('deadline-card');
@@ -3363,8 +3421,8 @@ setInterval(updateCountdown, 1000);
 function startCountdown(){
   const today = new Date(); today.setHours(0,0,0,0);
   const evs = filteredEvents()
-    .filter(e => !e.done && new Date(e.date) >= today)
-    .sort((a,b) => new Date(a.date) - new Date(b.date));
+    .filter(e => !e.done && parseDate(e.date) >= today)
+    .sort((a,b) => parseDate(a.date) - parseDate(b.date));
   countdownTarget = evs.length ? evs[0].date : null;
 }
 
@@ -3546,13 +3604,13 @@ function switchView(view, btn){
   // elsewhere, jump to the month of the next upcoming event (or the most recent one).
   if(view === 'month'){
     const monthHasEvents = STATE.events.some(e => {
-      const d = new Date(e.date);
+      const d = parseDate(e.date);
       return !isNaN(d) && d.getFullYear() === calY && d.getMonth() === calM;
     });
     if(!monthHasEvents && STATE.events.length){
       const today = new Date(); today.setHours(0,0,0,0);
       const valid = STATE.events
-        .map(e => new Date(e.date))
+        .map(e => parseDate(e.date))
         .filter(d => !isNaN(d.getTime()))
         .sort((a,b) => a - b);
       if(valid.length){
@@ -3591,7 +3649,7 @@ function renderAll(){
 function renderHoy(){
   const now = new Date();
   const today = new Date(); today.setHours(0,0,0,0);
-  const ds = today.toISOString().split('T')[0];
+  const ds = fmtDate(today);
   document.getElementById('hoy-date').textContent =
     `${DAYS_ES[now.getDay()]}, ${now.getDate()} de ${MONTHS_ES[now.getMonth()]}`;
 
@@ -3602,8 +3660,8 @@ function renderHoy(){
   const todayEvents = STATE.events.filter(e => e.date === ds);
 
   // Next deadline
-  const nextEvs = STATE.events.filter(e => !e.done && new Date(e.date) >= today)
-    .sort((a,b) => new Date(a.date) - new Date(b.date));
+  const nextEvs = STATE.events.filter(e => !e.done && parseDate(e.date) >= today)
+    .sort((a,b) => parseDate(a.date) - parseDate(b.date));
   const next = nextEvs[0];
   const nextSub = next ? getSub(next.subj) : null;
 
@@ -3612,8 +3670,8 @@ function renderHoy(){
   if(STATE.weeklyPlan && STATE.weeklyPlan.weekly_plan){
     const wkKey = getWeekKey(now);
     const wk = STATE.weeklyPlan.weekly_plan.find(w => {
-      const ws = new Date(w.week);
-      const we = new Date(ws); we.setDate(ws.getDate()+6);
+      const ws = parseDate(w.week);
+      const we = parseDate(ws); we.setDate(ws.getDate()+6);
       return today >= ws && today <= we;
     });
     if(wk && wk.steps) weekSteps = wk.steps;
@@ -3626,7 +3684,7 @@ function renderHoy(){
 
   // Deadline card
   if(next){
-    const ms = new Date(next.date).setHours(23,59,59) - now.getTime();
+    const ms = parseDate(next.date).setHours(23,59,59) - now.getTime();
     const d = Math.floor(ms/864e5);
     const h = Math.floor((ms%864e5)/3600000);
     const m = Math.floor((ms%3600000)/60000);
@@ -3798,10 +3856,10 @@ let weekOffset = 0;
 function getWeekDates(off){
   const now = new Date();
   const dow = now.getDay();
-  const mon = new Date(now);
+  const mon = parseDate(now);
   mon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1) + off*7);
   return Array(7).fill(0).map((_, i) => {
-    const d = new Date(mon); d.setDate(mon.getDate() + i); return d;
+    const d = parseDate(mon); d.setDate(mon.getDate() + i); return d;
   });
 }
 
@@ -3834,7 +3892,7 @@ function renderWeek(){
 
   dates.forEach((d, i) => {
     const isToday = d.getTime() === today.getTime();
-    const ds = d.toISOString().split('T')[0];
+    const ds = fmtDate(d);
     const dayEvs = evs.filter(e => e.date === ds);
     const dayBlocks = sched.filter(b => b.day === i);
     const hasNote = STATE.notes[ds];
@@ -4047,7 +4105,7 @@ function onDragPointerDown(e){
         const event = STATE.events[evIdx];
         if(event){
           const dates = getWeekDates(weekOffset);
-          const newDate = dates[col.index].toISOString().split('T')[0];
+          const newDate = fmtDate(dates[col.index]);
           event.date = newDate;
           saveState();
           const d = dates[col.index];
@@ -4169,7 +4227,7 @@ function renderCalendar(){
     const conflictClass = conflicts.level === 'high' ? 'high' : conflicts.level === 'warn' ? 'warn' : '';
 
     // Week number cell — clickable to jump to that week
-    html += `<div class="cal-week-num ${conflictClass}" onclick="goToWeekByDate('${rowMondayDate.toISOString().split('T')[0]}')" title="${conflicts.level==='normal'?'ir a esta semana':conflicts.count + ' eventos esta semana'}">
+    html += `<div class="cal-week-num ${conflictClass}" onclick="goToWeekByDate('${fmtDate(rowMondayDate)}')" title="${conflicts.level==='normal'?'ir a esta semana':conflicts.count + ' eventos esta semana'}">
       ${wkNum}
     </div>`;
 
@@ -4183,7 +4241,7 @@ function renderCalendar(){
       }
       const dt = new Date(calY, calM, dayNum);
       const isT = dt.getTime() === today.getTime();
-      const ds = dt.toISOString().split('T')[0];
+      const ds = fmtDate(dt);
       const evs = filteredEvents().filter(e => e.date === ds);
       const steps = getStepsForDate(ds);
       const note = STATE.notes[ds];
@@ -4212,7 +4270,7 @@ function renderCalendar(){
 
 // ISO week number
 function getISOWeek(d){
-  const date = new Date(d);
+  const date = parseDate(d);
   date.setHours(0,0,0,0);
   date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
   const week1 = new Date(date.getFullYear(), 0, 4);
@@ -4226,15 +4284,15 @@ function goToDay(dateStr){
 
 // Navigate to the week containing a specific date
 function goToWeekByDate(dateStr){
-  const target = new Date(dateStr);
+  const target = parseDate(dateStr);
   const today = new Date();
   // Compute Monday-aligned week difference
   const todayDow = today.getDay();
-  const todayMonday = new Date(today);
+  const todayMonday = parseDate(today);
   todayMonday.setDate(today.getDate() - (todayDow === 0 ? 6 : todayDow - 1));
   todayMonday.setHours(0,0,0,0);
   const targetDow = target.getDay();
-  const targetMonday = new Date(target);
+  const targetMonday = parseDate(target);
   targetMonday.setDate(target.getDate() - (targetDow === 0 ? 6 : targetDow - 1));
   targetMonday.setHours(0,0,0,0);
   weekOffset = Math.round((targetMonday - todayMonday) / (7*864e5));
@@ -4253,7 +4311,7 @@ let currentDayDetail = null;
 
 function showDayDetail(dateStr){
   currentDayDetail = dateStr;
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   const dayIdx = d.getDay() === 0 ? 6 : d.getDay() - 1;
   const dayEvs = STATE.events.filter(e => e.date === dateStr);
   const dayBlocks = STATE.schedule.filter(b => b.day === dayIdx);
@@ -4376,10 +4434,10 @@ function changeMonth(d){
 
 function getStepsForDate(ds){
   if(!STATE.weeklyPlan || !STATE.weeklyPlan.weekly_plan) return [];
-  const d = new Date(ds);
+  const d = parseDate(ds);
   return STATE.weeklyPlan.weekly_plan.flatMap(w => {
-    const ws = new Date(w.week);
-    const we = new Date(ws); we.setDate(ws.getDate() + 6);
+    const ws = parseDate(w.week);
+    const we = parseDate(ws); we.setDate(ws.getDate() + 6);
     if(d >= ws && d <= we) return (w.steps || []).slice(0, 2);
     return [];
   });
@@ -4409,7 +4467,7 @@ function renderGantt(){
   }
 
   // Only use valid dates for the range; ignore malformed ones to avoid NaN ranges
-  const validDates = evs.map(e => new Date(e.date)).filter(d => !isNaN(d.getTime()));
+  const validDates = evs.map(e => parseDate(e.date)).filter(d => !isNaN(d.getTime()));
   if(!validDates.length){
     document.getElementById('gantt-wrap').innerHTML = `
       <div class="gantt-empty-state">
@@ -4429,8 +4487,8 @@ function renderGantt(){
   document.getElementById('gantt-range').textContent =
     `${SEM_START.getDate()} ${MN_SHORT[SEM_START.getMonth()]} — ${SEM_END.getDate()} ${MN_SHORT[SEM_END.getMonth()]} ${SEM_END.getFullYear()}`;
 
-  const weeks = []; let wk = new Date(SEM_START);
-  while(wk <= SEM_END){ weeks.push(new Date(wk)); wk.setDate(wk.getDate() + 7); }
+  const weeks = []; let wk = parseDate(SEM_START);
+  while(wk <= SEM_END){ weeks.push(parseDate(wk)); wk.setDate(wk.getDate() + 7); }
   const totalW = weeks.length * WW;
   const today = new Date();
   const todayPx = Math.max(0, ((today - SEM_START)/(7*864e5))*WW);
@@ -4449,7 +4507,7 @@ function renderGantt(){
 
   let rows = [];
   visibleSubjs.forEach(sub => {
-    const subjEvs = evs.filter(e => e.subj === sub.id).sort((a,b) => new Date(a.date) - new Date(b.date));
+    const subjEvs = evs.filter(e => e.subj === sub.id).sort((a,b) => parseDate(a.date) - parseDate(b.date));
     if(!subjEvs.length) return;
     const subjSessions = (STATE.weeklyPlan && Array.isArray(STATE.weeklyPlan.weekly_plan)) ? STATE.weeklyPlan.weekly_plan.flatMap(w =>
       (w.sessions || []).filter(s => (s.subject || s.subj) === sub.id).map(s => ({week: w.week, task: s.task, hours: s.hours}))
@@ -4466,7 +4524,7 @@ function renderGantt(){
     const orphanEvs = evs.filter(e => {
       const inRow = rows.some(r => r.subjEvs.includes(e));
       return !inRow;
-    }).sort((a,b) => new Date(a.date) - new Date(b.date));
+    }).sort((a,b) => parseDate(a.date) - parseDate(b.date));
     if(orphanEvs.length){
       rows.push({
         sub: {id:'__orphan__', name:'otras tareas', color:'#8E8E8E'},
@@ -4561,13 +4619,13 @@ function renderGantt(){
     timelineCol += `<div style="position:absolute;top:${yPos}px;left:0;width:${totalW}px;height:${ROW_H_SUBJ}px;
       background:rgba(242,242,240,.7);border-bottom:1px solid var(--g200);z-index:2">`;
     if(subjEvs.length >= 2){
-      const x0 = ((new Date(subjEvs[0].date) - SEM_START)/(7*864e5))*WW;
-      const x1 = ((new Date(subjEvs[subjEvs.length-1].date) - SEM_START)/(7*864e5))*WW;
+      const x0 = ((parseDate(subjEvs[0].date) - SEM_START)/(7*864e5))*WW;
+      const x1 = ((parseDate(subjEvs[subjEvs.length-1].date) - SEM_START)/(7*864e5))*WW;
       timelineCol += `<div style="position:absolute;top:50%;transform:translateY(-50%);left:${x0}px;
         width:${Math.max(x1-x0,4)}px;height:7px;background:${sub.color};opacity:.2;border-radius:3px;z-index:1"></div>`;
     }
     subjEvs.forEach(ev => {
-      const px = ((new Date(ev.date) - SEM_START)/(7*864e5))*WW;
+      const px = ((parseDate(ev.date) - SEM_START)/(7*864e5))*WW;
       const isE = ev.type === 'examen';
       const evIdx = STATE.events.indexOf(ev);
       timelineCol += `<div title="${sub.name}: ${ev.title} (${ev.date})"
@@ -4583,14 +4641,14 @@ function renderGantt(){
       timelineCol += `<div style="position:absolute;top:${yPos}px;left:0;width:${totalW}px;height:${ROW_H_PHASE}px;
         border-bottom:1px solid #f0f0ec;z-index:2">`;
       if(isAI && ph.week){
-        const wkDate = new Date(ph.week);
+        const wkDate = parseDate(ph.week);
         const px = ((wkDate - SEM_START)/(7*864e5))*WW;
         timelineCol += `<div style="position:absolute;top:50%;transform:translateY(-50%);
           left:${px+2}px;width:${WW-4}px;height:5px;background:${sub.color};
           opacity:.5;border-radius:2px" title="${ph.task||''} (${ph.hours||'?'}h)"></div>`;
       } else if(subjEvs.length >= 2){
-        const x0 = ((new Date(subjEvs[0].date) - SEM_START)/(7*864e5))*WW;
-        const x1 = ((new Date(subjEvs[subjEvs.length-1].date) - SEM_START)/(7*864e5))*WW;
+        const x0 = ((parseDate(subjEvs[0].date) - SEM_START)/(7*864e5))*WW;
+        const x1 = ((parseDate(subjEvs[subjEvs.length-1].date) - SEM_START)/(7*864e5))*WW;
         const span = Math.max(x1-x0, WW);
         const phX = x0 + span*(pi/phases.length);
         const phW = Math.max(span/phases.length - 6, WW*0.5);
@@ -4741,21 +4799,21 @@ function getLinkInfo(link){
   // Returns {icon, label, host, isExternal}
   const u = link.url;
   if(link.type === 'folder'){
-    return {icon:'📁', label: u, host: 'carpeta local', isExternal: false};
+    return {icon:'▸', label: u, host: 'carpeta local', isExternal: false};
   }
   if(link.type === 'app'){
-    return {icon:'🔗', label: u, host: 'app link', isExternal: true};
+    return {icon:'↗', label: u, host: 'app link', isExternal: true};
   }
   // URL — detect host
   let host = '';
-  let icon = '🔗';
+  let icon = '↗';
   try {
     const parsed = new URL(u);
     host = parsed.hostname.replace(/^www\./,'');
-    if(host.includes('drive.google')) icon = '📂';
-    else if(host.includes('docs.google')) icon = '📄';
+    if(host.includes('drive.google')) icon = '▸';
+    else if(host.includes('docs.google')) icon = '▤';
     else if(host.includes('figma')) icon = '◧';
-    else if(host.includes('archdaily')) icon = '🏛';
+    else if(host.includes('archdaily')) icon = '▤';
     else if(host.includes('pinterest')) icon = '◉';
     else if(host.includes('youtube')||host.includes('youtu.be')) icon = '▶';
     else if(host.includes('github')) icon = '◰';
@@ -4858,9 +4916,9 @@ function duplicateCurrentEvent(){
   const original = STATE.events[editingEventIdx];
   if(!original) return;
   // Compute next week's date for the duplicated event
-  const origDate = new Date(original.date);
+  const origDate = parseDate(original.date);
   origDate.setDate(origDate.getDate() + 7);
-  const newDate = origDate.toISOString().split('T')[0];
+  const newDate = fmtDate(origDate);
   const copy = {
     ...original,
     date: newDate,
@@ -5207,12 +5265,12 @@ function renderChips(){
   }
   upload.classList.add('has-files');
   el.innerHTML = pendingFiles.map((f, i) => {
-    let icon = f.isDoc ? '📄' : '🖼';
+    let icon = f.isDoc ? '▤' : '▦';
     let statusClass = f.isDoc ? 'chip-type-pdf' : 'chip-type-img';
     let extra = '';
     if(f.processing){ icon = '⏳'; extra = ' · leyendo…'; statusClass += ' chip-processing'; }
     else if(f.error){ icon = '⚠'; extra = ' · error'; }
-    else if(f.scanned){ icon = '📄'; extra = ' · sin texto'; }
+    else if(f.scanned){ icon = '▤'; extra = ' · sin texto'; }
     return `
     <div class="file-chip ${statusClass}">
       <span class="chip-icon">${icon}</span>
@@ -5243,12 +5301,14 @@ function getIaSystemPrompt(){
     events_count: STATE.events.length,
     has_schedule: STATE.schedule.length > 0,
     has_plan: !!STATE.weeklyPlan,
-    today: new Date().toISOString().split('T')[0],
+    today: fmtDate(new Date()),
     current_view: document.querySelector('.view.active')?.id.replace('view-','') || 'hoy',
     selected_subject: selectedSubjId
   };
 
   return `eres el asistente de planificación de plan, herramienta para estudiantes de arquitectura de miradapropia.org.
+
+estilo: escribe en minúsculas, tono cercano y directo, sin emojis nunca.
 
 CONTEXTO ACTUAL DEL ESTUDIANTE:
 ${JSON.stringify(ctx, null, 2)}
@@ -5261,7 +5321,7 @@ CAPACIDADES:
 5. responder preguntas sobre planificación
 6. extraer los pesos de evaluación (%) del plan docente si el estudiante lo sube
 
-⚠️ EXTRACCIÓN EXPERTA DE DOCUMENTOS E IMÁGENES:
+⚠ EXTRACCIÓN EXPERTA DE DOCUMENTOS E IMÁGENES:
 cuando el estudiante adjunte un PDF o una imagen, tu trabajo es LEERLO COMPLETO y volcar TODA la información útil a la estructura de plan. actúa como un planificador experto que no deja escapar ningún dato.
 
 NOTA TÉCNICA: el texto de los PDF llega ya extraído dentro del mensaje, delimitado por "=== contenido del pdf ... ===" y "=== fin del pdf ===". léelo entero. las imágenes (fotos de horarios, capturas, pizarras) las ves directamente. si un pdf llega marcado como "sin texto seleccionable", pídele al estudiante una foto de las páginas con el calendario o la evaluación.
@@ -5287,8 +5347,8 @@ SÉ EXHAUSTIVO PERO NO INVENTES: extrae todo lo que esté en el documento, pero 
 
 DESPUÉS DE EXTRAER, PLANIFICA: una vez volcada la información, genera automáticamente un weekly_plan inicial coherente con las fechas detectadas y las notas objetivo (si las hay), sin esperar a que el estudiante lo pida — ya tiene todo el contexto que necesita.
 
-⚠️ MEMORIA DE LA CONVERSACIÓN:
-recuerdas TODO lo que ha pasado en esta conversación: los archivos que el estudiante ha subido, lo que extrajiste de ellos, sus respuestas y las asignaturas/eventos/horario que ya has creado (están en el CONTEXTO ACTUAL de arriba). NUNCA vuelvas a pedir un archivo que ya te han subido ni preguntes información que ya tienes en el contexto. si el estudiante dice "añade una sesión más de física", ya sabes qué es física y cuándo tiene cosas; actúa directamente. solo pregunta si falta un dato que de verdad no aparece por ningún lado.
+⚠ MEMORIA DE LA CONVERSACIÓN:
+recuerdas TODO lo que ha pasado en esta conversación: los archivos que el estudiante ha subido, lo que extrajiste de ellos, sus respuestas y las asignaturas/eventos/horario que ya has creado (están en el CONTEXTO ACTUAL de arriba). NUNCA vuelvas a pedir un archivo que ya te han subido ni preguntes información que ya tienes en el contexto. si el estudiante dice "añade una sesión más de física", ya sabes qué es física y cuándo tiene cosas; actúa directamente. solo pregunta si falta un dato que de verdad no aparece por ningún lado. (la conversación puede llegar recortada a los últimos mensajes; el CONTEXTO ACTUAL de arriba siempre refleja el estado real y completo del plan.)
 
 PLANIFICACIÓN BASADA EN RENDIMIENTO Y NOTA OBJETIVO:
 en el contexto tienes, por asignatura: avg_grade (nota media obtenida hasta ahora, escala 0-10), graded_count (cuántas notas tiene), pending_eval (evaluaciones pendientes), target_grade (nota que el estudiante quiere sacar, null si no la ha puesto = objetivo 5 por defecto) y hours_logged (horas de estudio registradas).
@@ -5308,7 +5368,7 @@ la NOTA OBJETIVO es la variable más importante para decidir cuánto tiempo dedi
 
 cuando el estudiante mencione qué nota quiere ("quiero sacar un 8 en cálculo", "con aprobar física me vale"), ponlo en target_grade del array subjects (8 y 5 respectivamente) y replanifica en consecuencia.
 
-⚠️ REGLA CRÍTICA — VINCULACIÓN DE ASIGNATURAS:
+⚠ REGLA CRÍTICA — VINCULACIÓN DE ASIGNATURAS:
 todo evento, bloque de horario o sesión de plan DEBE vincularse a un id de asignatura existente. si el estudiante menciona una asignatura que no existe en el contexto actual:
 1. PRIMERO crea la asignatura en el array "subjects" (con id sin acentos ni espacios, ej: "fisica_2", "fisica_ii", "estructuras_3")
 2. DESPUÉS crea events/schedule/weekly_plan referenciando ese mismo id
@@ -5316,12 +5376,12 @@ todo evento, bloque de horario o sesión de plan DEBE vincularse a un id de asig
 
 NUNCA dejes eventos o tareas sin asignatura. NUNCA uses "otra" o "general" como id, siempre crea la asignatura específica.
 
-⚠️ REGLA CRÍTICA — PLAN DE TRABAJO VISIBLE:
+⚠ REGLA CRÍTICA — PLAN DE TRABAJO VISIBLE:
 cuando crees un weekly_plan con sessions, también DEBES crear entradas correspondientes en "schedule" para que las sesiones de estudio aparezcan en la vista semanal. ejemplo:
 si el plan dice "sesión de física 2h el martes", añade también un schedule:
 {"day":1,"subj":"fisica_2","startH":18,"endH":20,"type":"estudio","title":"física 2 · estudio"}
 
-⚠️ CUÁNDO ACTUAR DE INMEDIATO (generar json directamente en el MISMO turno, SIN pedir confirmación):
+⚠ CUÁNDO ACTUAR DE INMEDIATO (generar json directamente en el MISMO turno, SIN pedir confirmación):
 - SIEMPRE que el estudiante suba un PDF o imagen (plan docente, horario, calendario, captura): extrae TODA la información y créala YA con json. NO propongas y esperes — el estudiante subió el archivo justamente para que lo vuelques al plan. quedarte en una propuesta deja su plan vacío y es exactamente lo que NO quiere.
 - SIEMPRE que el plan esté vacío o casi vacío (primera configuración): crea asignaturas, eventos, horario y plan de una vez.
 - cuando el estudiante pida explícitamente "organiza", "crea", "añade", "configura", "monta mi plan", "identifica las asignaturas", etc.
@@ -5330,7 +5390,7 @@ si el plan dice "sesión de física 2h el martes", añade también un schedule:
 
 en TODOS estos casos responde CON json dentro de bloques \`\`\`json ... \`\`\`. puedes poner una frase breve de resumen ANTES del json (ej: "he detectado 4 asignaturas, 9 entregas y 2 exámenes, los añado:"), pero el json DEBE estar siempre presente. sin json no se crea nada.
 
-⚠️ CUÁNDO PROPONER PRIMERO (texto sin json, esperar confirmación):
+⚠ CUÁNDO PROPONER PRIMERO (texto sin json, esperar confirmación):
 SOLO cuando vas a BORRAR o reorganizar drásticamente un plan que YA está lleno (ej: "bórralo todo y empieza de cero", "reorganiza por completo las 8 semanas"). di brevemente qué harás y espera el "sí".
 
 ante cualquier duda, ACTÚA y genera el json. es mejor crear y luego ajustar que dejar el plan vacío.
@@ -5344,7 +5404,7 @@ FORMATO DEL JSON (dentro de bloques \`\`\`json ... \`\`\`):
   "summary": "resumen breve"
 }
 
-⚠️ PESOS DE EVALUACIÓN (campo "weight"):
+⚠ PESOS DE EVALUACIÓN (campo "weight"):
 si el estudiante sube el plan docente (PDF o imagen) o menciona cuánto vale cada examen/entrega, extrae el peso de cada uno en porcentaje (0-100) y ponlo en el campo "weight" del evento correspondiente. esto permite a la app calcular la media ponderada y predecir qué nota necesita para aprobar. ejemplo: si el plan dice "examen final 50%, prácticas 30%, trabajo 20%", crea los tres eventos con weight:50, weight:30, weight:20. la suma de pesos de una asignatura debería dar 100. NO inventes pesos si no tienes la información — déjalo sin weight.
 
 NOTA: no puedes poner las notas obtenidas (campo grade), eso lo rellena el estudiante manualmente cuando recibe la calificación. tú solo defines los pesos.
@@ -5441,7 +5501,10 @@ async function sendMsg(){
   let streamBubble = null;
 
   try{
-    const apiMessages = STATE.iaMessages.map(m => ({role: m.role, content: m.content}));
+    // el estado real del plan ya viaja en el system prompt: basta con los últimos
+    // mensajes (controla el coste por turno y evita errores de contexto a final de curso)
+    let apiMessages = STATE.iaMessages.slice(-IA_HISTORY_LIMIT).map(m => ({role: m.role, content: m.content}));
+    while(apiMessages.length && apiMessages[0].role !== 'user') apiMessages.shift();
     const res = await fetch('/api/claude', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -5716,7 +5779,7 @@ function importAIPlan(txt){
               ex.weight = Math.min(100, Math.max(0, parseFloat(ev.weight)));
             }
             if(oldDate !== ex.date){
-              const od = new Date(oldDate); const nd = new Date(ex.date);
+              const od = parseDate(oldDate); const nd = parseDate(ex.date);
               logChange('update', `${ev.title} (${subName}) movido del ${od.getDate()}/${od.getMonth()+1} al ${nd.getDate()}/${nd.getMonth()+1}`);
             }
           } else {
@@ -5729,7 +5792,7 @@ function importAIPlan(txt){
           if(!ex){
             const w = (ev.weight !== undefined && ev.weight !== null && !isNaN(ev.weight)) ? Math.min(100, Math.max(0, parseFloat(ev.weight))) : null;
             STATE.events.push({date: ev.date, title: ev.title, subj, type: ev.type || 'entrega', done: false, weight: w, grade: null});
-            const d = new Date(ev.date);
+            const d = parseDate(ev.date);
             const wNote = w !== null ? ` · ${w}%` : '';
             logChange('add', `nuevo: ${ev.title} (${subName})${wNote} — ${d.getDate()}/${d.getMonth()+1}`);
           } else if(ev.weight !== undefined && ev.weight !== null && !isNaN(ev.weight)){
@@ -5876,6 +5939,14 @@ function initIaWelcome(){
   }
 }
 
+function clearIaChat(){
+  if(!confirm('¿empezar una conversación nueva con la ia? tu plan (asignaturas, eventos, horario) no se toca.')) return;
+  STATE.iaMessages = [];
+  saveState();
+  initIaWelcome();
+  showToast('conversación reiniciada');
+}
+
 // ═══════════════════════════════════════════
 // IA COMMAND BAR TOGGLE
 // ═══════════════════════════════════════════
@@ -5946,19 +6017,19 @@ function computeWorkload(){
   // Returns array of {weekKey, label, weight, deliverables, exams, hours, isCurrent, level}
   const today = new Date(); today.setHours(0,0,0,0);
   const dow = today.getDay();
-  const monday = new Date(today);
+  const monday = parseDate(today);
   monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
 
   const weeks = [];
   for(let w = 0; w < 8; w++){
-    const wkStart = new Date(monday);
+    const wkStart = parseDate(monday);
     wkStart.setDate(monday.getDate() + w*7);
-    const wkEnd = new Date(wkStart);
+    const wkEnd = parseDate(wkStart);
     wkEnd.setDate(wkStart.getDate() + 6);
 
     // Count deliverables, exams in this week
     const evs = STATE.events.filter(e => {
-      const d = new Date(e.date);
+      const d = parseDate(e.date);
       return d >= wkStart && d <= wkEnd && !e.done;
     });
     const deliverables = evs.filter(e => e.type === 'entrega').length;
@@ -5968,7 +6039,7 @@ function computeWorkload(){
     let planHours = 0;
     if(STATE.weeklyPlan && STATE.weeklyPlan.weekly_plan){
       const wk = STATE.weeklyPlan.weekly_plan.find(p => {
-        const ps = new Date(p.week);
+        const ps = parseDate(p.week);
         return Math.abs(ps - wkStart) < 4*864e5;
       });
       if(wk && wk.sessions){
@@ -5983,7 +6054,7 @@ function computeWorkload(){
     else if(deliverables + exams >= 2 || weight > 12) level = 'warn';
 
     weeks.push({
-      weekKey: wkStart.toISOString().split('T')[0],
+      weekKey: fmtDate(wkStart),
       label: `${wkStart.getDate()} ${MN_SHORT[wkStart.getMonth()]}`,
       weight,
       deliverables, exams, planHours,
@@ -6030,13 +6101,13 @@ function renderWorkloadChart(){
 function getWeekConflicts(weekDate){
   // Returns {level: 'normal'|'warn'|'high', count, labels:[]}
   const dow = weekDate.getDay();
-  const monday = new Date(weekDate);
+  const monday = parseDate(weekDate);
   monday.setDate(weekDate.getDate() - (dow === 0 ? 6 : dow - 1));
   monday.setHours(0,0,0,0);
-  const sunday = new Date(monday);
+  const sunday = parseDate(monday);
   sunday.setDate(monday.getDate() + 6);
   const evs = STATE.events.filter(e => {
-    const d = new Date(e.date);
+    const d = parseDate(e.date);
     return d >= monday && d <= sunday && !e.done && (e.type === 'entrega' || e.type === 'examen');
   });
   const count = evs.length;
@@ -6057,7 +6128,7 @@ function renderWeekConflictBanner(){
   if(conflicts.level === 'normal') return '';
   const items = conflicts.events.map(e => {
     const sub = getSub(e.subj);
-    const d = new Date(e.date);
+    const d = parseDate(e.date);
     return `${e.type === 'examen' ? '⬡' : '●'} ${e.title} (${d.getDate()}/${d.getMonth()+1})`;
   }).join(' · ');
   const word = conflicts.level === 'high' ? 'sobrecarga importante' : 'múltiples entregas';
@@ -6105,7 +6176,7 @@ if(window.matchMedia){
 // AMBIENT MODE — modo concentración con video lofi
 // ═══════════════════════════════════════════
 const AMBIENT_VIDEO = 'https://github.com/miradapropia/plan/releases/download/v1.0.0/lofi.mp4';
-const AMBIENT_POSTER = 'ambient/lofi-poster.jpg';
+const AMBIENT_POSTER = 'ambient/lofi-poster.png';
 let ambientOn = false;
 let activeAmbientView = null;
 let ambientVideoLoaded = false;
@@ -6270,15 +6341,15 @@ function renderAmbient(){
   // Countdown
   const today = new Date(); today.setHours(0,0,0,0);
   const evs = STATE.events
-    .filter(e => !e.done && new Date(e.date) >= today)
-    .sort((a,b) => new Date(a.date) - new Date(b.date));
+    .filter(e => !e.done && parseDate(e.date) >= today)
+    .sort((a,b) => parseDate(a.date) - parseDate(b.date));
   const cdBig = document.getElementById('aw-cd-big');
   const cdTitle = document.getElementById('aw-cd-title');
   const cdSub = document.getElementById('aw-cd-sub');
   if(evs.length){
     const ev = evs[0];
     const sub = getSub(ev.subj);
-    const ms = new Date(ev.date).setHours(23,59,59) - Date.now();
+    const ms = parseDate(ev.date).setHours(23,59,59) - Date.now();
     const d = Math.floor(ms/864e5);
     const hh = Math.floor((ms%864e5)/3600000);
     const mm = Math.floor((ms%3600000)/60000);

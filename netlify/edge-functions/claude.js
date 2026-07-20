@@ -1,64 +1,119 @@
-// Netlify EDGE Function — proxy to the Anthropic API with SSE streaming.
+// Netlify EDGE Function — proxy a la API de Anthropic con streaming SSE.
 //
-// Why an Edge Function (not a normal /netlify/functions one):
-// Standard Netlify Functions on the free tier are killed after 10 seconds.
-// Streaming does NOT bypass that cap, which is what caused the recurring
-// "la lectura del archivo tardó demasiado" timeout when the model needed
-// more than 10s to generate a full plan. Edge Functions run on Deno at the
-// edge and allow long-lived streaming responses, so the timeout disappears.
+// Por qué una Edge Function (y no una Function normal):
+// las Functions estándar del tier gratuito se cortan a los 10 segundos, y el
+// streaming NO evita ese límite. Las Edge Functions corren en Deno y permiten
+// respuestas largas en streaming, así que el timeout desaparece.
 //
-// Deploy: place this file at  netlify/edge-functions/claude.js
-// It serves the route /api/claude (see the config export at the bottom).
+// ENDURECIMIENTO (protección de costes):
+// - el MODELO se fija aquí en el servidor: se ignora el que pida el cliente
+// - max_tokens con tope
+// - solo se reenvían a la API los campos de la lista blanca
+// - límites de tamaño en messages y system
+// - comprobación del header Origin contra los dominios permitidos
+//
+// Despliegue: netlify/edge-functions/claude.js — sirve la ruta /api/claude.
 
-export default async (request, context) => {
-  const cors = {
-    "Access-Control-Allow-Origin": "*",
+const MODEL = "claude-sonnet-4-6";       // único modelo permitido (el cliente no elige)
+const MAX_TOKENS_CAP = 8000;             // tope de tokens de salida por petición
+const MAX_MESSAGES = 60;                 // tope de mensajes por conversación enviada
+const MAX_SYSTEM_CHARS = 60000;          // tope del system prompt
+const MAX_BODY_CHARS = 3000000;          // tope aproximado del cuerpo saliente (~3 MB)
+
+const ALLOWED_ORIGINS = [
+  "https://plan.miradapropia.org",
+  "http://localhost:8888",   // netlify dev
+  "http://localhost:3000",
+  "http://127.0.0.1:8888",
+];
+
+function originAllowed(origin) {
+  if (!origin) return true; // peticiones sin Origin (misma página en algunos navegadores)
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  // previews de deploy y el subdominio por defecto del sitio en netlify
+  try {
+    const host = new URL(origin).hostname;
+    if (host.endsWith(".netlify.app")) return true;
+  } catch (_) {}
+  return false;
+}
+
+function corsFor(origin) {
+  return {
+    "Access-Control-Allow-Origin": originAllowed(origin) && origin ? origin : "https://plan.miradapropia.org",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
   };
+}
+
+function jsonError(status, type, message, cors) {
+  return new Response(
+    JSON.stringify({ error: { type, message } }),
+    { status, headers: { ...cors, "Content-Type": "application/json" } }
+  );
+}
+
+export default async (request, context) => {
+  const origin = request.headers.get("origin");
+  const cors = corsFor(origin);
 
   // Preflight
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: cors });
   }
   if (request.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: { message: "Method Not Allowed" } }),
-      { status: 405, headers: { ...cors, "Content-Type": "application/json" } }
-    );
+    return jsonError(405, "method_not_allowed", "Method Not Allowed", cors);
+  }
+  if (!originAllowed(origin)) {
+    return jsonError(403, "forbidden_origin", "origen no permitido.", cors);
   }
 
-  // API key from Netlify environment variables
+  // API key desde las variables de entorno de Netlify
   const apiKey =
     (typeof Netlify !== "undefined" && Netlify.env.get("ANTHROPIC_API_KEY")) ||
     (typeof Deno !== "undefined" && Deno.env.get("ANTHROPIC_API_KEY"));
 
   if (!apiKey) {
-    return new Response(
-      JSON.stringify({
-        error: {
-          type: "config_error",
-          message:
-            "ANTHROPIC_API_KEY no está configurada en netlify (site settings → environment variables).",
-        },
-      }),
-      { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
-    );
+    return jsonError(500, "config_error",
+      "ANTHROPIC_API_KEY no está configurada en netlify (site settings → environment variables).", cors);
   }
 
-  // Parse the incoming request body
+  // Parsear el cuerpo entrante
   let body;
   try {
     body = await request.json();
   } catch (e) {
-    return new Response(
-      JSON.stringify({ error: { message: "Invalid JSON in request body" } }),
-      { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
-    );
+    return jsonError(400, "invalid_request", "Invalid JSON in request body", cors);
   }
 
-  // Force streaming on the upstream call so bytes flow continuously
-  body.stream = true;
+  // Validaciones de forma y tamaño
+  if (!Array.isArray(body.messages) || body.messages.length === 0) {
+    return jsonError(400, "invalid_request", "messages debe ser un array no vacío.", cors);
+  }
+  if (body.messages.length > MAX_MESSAGES) {
+    return jsonError(400, "invalid_request", "demasiados mensajes en la conversación.", cors);
+  }
+  if (body.system !== undefined && (typeof body.system !== "string" || body.system.length > MAX_SYSTEM_CHARS)) {
+    return jsonError(400, "invalid_request", "system inválido o demasiado largo.", cors);
+  }
+
+  // LISTA BLANCA: solo estos campos viajan a la API; modelo y tope de tokens
+  // los decide el servidor, se pida lo que se pida desde el cliente.
+  const requestedMax = Number(body.max_tokens);
+  const outbound = {
+    model: MODEL,
+    max_tokens: Math.min(Number.isFinite(requestedMax) && requestedMax > 0 ? requestedMax : MAX_TOKENS_CAP, MAX_TOKENS_CAP),
+    stream: true,
+    messages: body.messages,
+  };
+  if (typeof body.system === "string") outbound.system = body.system;
+
+  const outboundStr = JSON.stringify(outbound);
+  if (outboundStr.length > MAX_BODY_CHARS) {
+    return jsonError(413, "invalid_request",
+      "la petición es demasiado grande. si has adjuntado archivos, prueba con una versión más ligera.", cors);
+  }
 
   let upstream;
   try {
@@ -69,18 +124,13 @@ export default async (request, context) => {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify(body),
+      body: outboundStr,
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({
-        error: { type: "upstream_error", message: "No se pudo conectar con anthropic: " + err.message },
-      }),
-      { status: 502, headers: { ...cors, "Content-Type": "application/json" } }
-    );
+    return jsonError(502, "upstream_error", "No se pudo conectar con anthropic: " + err.message, cors);
   }
 
-  // If Anthropic returned a non-OK status, pass its JSON error straight through
+  // Si Anthropic devolvió un estado no-OK, pasar su error JSON tal cual
   const upstreamType = upstream.headers.get("content-type") || "";
   if (!upstream.ok && !upstreamType.includes("event-stream")) {
     const errText = await upstream.text();
@@ -90,7 +140,7 @@ export default async (request, context) => {
     });
   }
 
-  // Stream the SSE body straight back to the browser
+  // Devolver el SSE al navegador en streaming
   return new Response(upstream.body, {
     status: upstream.status,
     headers: {
@@ -101,5 +151,5 @@ export default async (request, context) => {
   });
 };
 
-// Route this edge function at /api/claude
+// Esta edge function sirve la ruta /api/claude
 export const config = { path: "/api/claude" };
