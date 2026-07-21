@@ -11,6 +11,10 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "interest-cohort=(), camera=(), microphone=(), geolocation=()"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+    # csp construida desde el inventario real de recursos de la app:
+    # pdf.js desde jsdelivr, fuentes de google, vídeo ambiente desde github releases
+    # y los tres reproductores de música permitidos. todo lo demás, bloqueado.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: https://github.com https://objects.githubusercontent.com https://release-assets.githubusercontent.com; frame-src https://open.spotify.com https://www.youtube-nocookie.com https://www.youtube.com https://w.soundcloud.com; connect-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 
 # index.html — never aggressive cache (so updates ship fast)
 [[headers]]

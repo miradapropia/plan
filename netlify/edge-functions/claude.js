@@ -10,7 +10,9 @@
 // - max_tokens con tope
 // - solo se reenvían a la API los campos de la lista blanca
 // - límites de tamaño en messages y system
-// - comprobación del header Origin contra los dominios permitidos
+// - header Origin OBLIGATORIO y comprobado contra los dominios permitidos
+//   (los previews *.netlify.app solo se aceptan si son de este mismo sitio)
+// - contador diario agregado de peticiones en netlify blobs (store "metricas-ia")
 //
 // Despliegue: netlify/edge-functions/claude.js — sirve la ruta /api/claude.
 
@@ -27,24 +29,47 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:8888",
 ];
 
-function originAllowed(origin) {
-  if (!origin) return true; // peticiones sin Origin (misma página en algunos navegadores)
+function originAllowed(origin, context) {
+  // los navegadores SIEMPRE envían Origin en un POST hecho con fetch();
+  // una petición sin Origin viene de curl/bots, no de la app → se rechaza.
+  if (!origin) return false;
   if (ALLOWED_ORIGINS.includes(origin)) return true;
-  // previews de deploy y el subdominio por defecto del sitio en netlify
+  // previews de deploy y subdominio por defecto, pero SOLO los de este sitio
   try {
     const host = new URL(origin).hostname;
-    if (host.endsWith(".netlify.app")) return true;
+    const site = context && context.site && context.site.name;
+    if (site) {
+      if (host === `${site}.netlify.app` || host.endsWith(`--${site}.netlify.app`)) return true;
+    } else if (host.endsWith(".netlify.app")) {
+      // sin metadatos del sitio: se mantiene el comportamiento anterior
+      return true;
+    }
   } catch (_) {}
   return false;
 }
 
-function corsFor(origin) {
+function corsFor(origin, context) {
   return {
-    "Access-Control-Allow-Origin": originAllowed(origin) && origin ? origin : "https://plan.miradapropia.org",
+    "Access-Control-Allow-Origin": originAllowed(origin, context) && origin ? origin : "https://plan.miradapropia.org",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
+}
+
+// ─── contador diario de peticiones (netlify blobs) ──────────────────────────
+// dato agregado y anónimo: cuántas peticiones llegan a la ia cada día.
+// import dinámico + try/catch + carrera con timeout: si blobs no está
+// disponible o tarda, el proxy sigue funcionando exactamente igual.
+async function bumpDailyCounter() {
+  try {
+    const { getStore } = await import("@netlify/blobs");
+    const store = getStore("metricas-ia");
+    // clave del día en hora de madrid (regla de la casa: nunca toISOString para días locales)
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
+    const cur = parseInt((await store.get(day)) || "0", 10) || 0;
+    await store.set(day, String(cur + 1));
+  } catch (_) { /* el contador jamás bloquea el proxy */ }
 }
 
 function jsonError(status, type, message, cors) {
@@ -56,7 +81,7 @@ function jsonError(status, type, message, cors) {
 
 export default async (request, context) => {
   const origin = request.headers.get("origin");
-  const cors = corsFor(origin);
+  const cors = corsFor(origin, context);
 
   // Preflight
   if (request.method === "OPTIONS") {
@@ -65,7 +90,7 @@ export default async (request, context) => {
   if (request.method !== "POST") {
     return jsonError(405, "method_not_allowed", "Method Not Allowed", cors);
   }
-  if (!originAllowed(origin)) {
+  if (!originAllowed(origin, context)) {
     return jsonError(403, "forbidden_origin", "origen no permitido.", cors);
   }
 
@@ -114,6 +139,9 @@ export default async (request, context) => {
     return jsonError(413, "invalid_request",
       "la petición es demasiado grande. si has adjuntado archivos, prueba con una versión más ligera.", cors);
   }
+
+  // contar la petición del día (máx. 400 ms; nunca bloquea la respuesta)
+  await Promise.race([bumpDailyCounter(), new Promise(r => setTimeout(r, 400))]);
 
   let upstream;
   try {

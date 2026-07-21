@@ -1339,6 +1339,10 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
       <p style="font-size:12px;line-height:1.7;color:var(--g600);margin-bottom:10px">
         si borras los datos del navegador o cambias de dispositivo, el plan se pierde: haz copias con datos → exportar.
       </p>
+      <p style="font-size:12px;line-height:1.7;color:var(--g600);margin-bottom:10px">
+        si añades música, el reproductor de esa plataforma (spotify, youtube o soundcloud) se carga
+        desde sus servidores y puede usar sus propias cookies. no se carga nada hasta que tú pegas un enlace.
+      </p>
       <p style="font-size:12px;line-height:1.7;color:var(--g600)">
         más detalle en la <a href="https://miradapropia.org/politica-de-privacidad-miradapropia/" target="_blank" style="color:var(--black)">política de privacidad de miradapropia</a>.
       </p>
@@ -1878,6 +1882,28 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
 </div>
 
 <!-- MODAL: confirm reset -->
+<div class="modal-overlay" id="modal-import" onclick="closeModal(event,'modal-import')">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">importar copia</div>
+      <button class="modal-close" onclick="closeModalForce('modal-import')" aria-label="cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;line-height:1.7;color:var(--g600)">
+        el archivo contiene <strong id="imp-sum-in"></strong> y sustituirá tu plan actual
+        (<span id="imp-sum-cur"></span>). antes de sustituirlo se guarda una copia del plan
+        actual en este navegador.
+      </p>
+    </div>
+    <div class="modal-foot">
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="modal-btn" onclick="closeModalForce('modal-import')">cancelar</button>
+        <button class="modal-btn primary" onclick="confirmImportNow()">importar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-confirm" onclick="closeModal(event,'modal-confirm')">
   <div class="modal">
     <div class="modal-head">
@@ -2023,6 +2049,85 @@ const SUBJECT_COLORS = [
   '#4A7C7E','#8E4162','#5C5C5C','#3D6B4F','#7A4419'
 ];
 
+// ─── seguridad · escapado y saneado ──────────────────────────────
+// regla de la casa: los textos se guardan crudos y se ESCAPAN AL PINTAR.
+// todo lo que entra desde fuera (importar copia, respuesta de la ia y el
+// propio localStorage) pasa por sanitizeState() antes de tocar STATE.
+const SAFE_ID_RE = /^[\w-]{1,64}$/;
+const EMBED_HOSTS_RE = /^https:\/\/(open\.spotify\.com\/embed\/|www\.youtube(-nocookie)?\.com\/embed\/|w\.soundcloud\.com\/player\/)/;
+
+function esc(v){
+  if(v == null) return '';
+  return String(v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// para interpolar un valor dentro de un handler inline: json + escape de atributo
+function escJsAttr(v){ return esc(JSON.stringify(String(v ?? ''))); }
+function safeStr(v, max){ return v == null ? '' : String(v).slice(0, max); }
+function safeColor(c){ return SUBJECT_COLORS.includes(c) ? c : SUBJECT_COLORS[0]; }
+function safeHttpUrl(u){ u = safeStr(u, 2000).trim(); return /^https?:\/\//i.test(u) ? u : null; }
+
+function sanitizeState(raw){
+  const base = DEFAULT_STATE();
+  const st = {};
+  // lista blanca de claves de primer nivel
+  Object.keys(base).forEach(k => { st[k] = (raw && raw[k] !== undefined) ? raw[k] : base[k]; });
+  // los campos que nacen como array u objeto deben seguir siéndolo
+  Object.keys(base).forEach(k => {
+    if(Array.isArray(base[k]) && !Array.isArray(st[k])) st[k] = [];
+    else if(base[k] && typeof base[k] === 'object' && !Array.isArray(base[k])
+      && (st[k] === null || typeof st[k] !== 'object' || Array.isArray(st[k]))) st[k] = {};
+  });
+  // recorte genérico de tamaños (el escapado html se hace al pintar)
+  const walk = (node, depth) => {
+    if(depth > 8 || node == null) return node;
+    if(typeof node === 'string') return node.slice(0, 8000);
+    if(Array.isArray(node)) return node.slice(0, 1200).map(x => walk(x, depth + 1));
+    if(typeof node === 'object'){
+      const out = {};
+      Object.keys(node).slice(0, 80).forEach(k => { out[k] = walk(node[k], depth + 1); });
+      return out;
+    }
+    return node;
+  };
+  Object.keys(st).forEach(k => { st[k] = walk(st[k], 0); });
+
+  // ids seguros y coherentes (acaban dentro de handlers inline)
+  const idMap = new Map();
+  const fixId = (id) => {
+    id = String(id ?? '');
+    if(SAFE_ID_RE.test(id)) return id;
+    if(!idMap.has(id)) idMap.set(id, 'x' + Math.random().toString(36).slice(2, 10));
+    return idMap.get(id);
+  };
+  st.subjects.forEach(su => {
+    if(su && typeof su === 'object'){
+      su.id = fixId(su.id);
+      su.color = safeColor(su.color);
+    }
+  });
+  [st.events, st.schedule].forEach(coll => coll.forEach(x => {
+    if(x && typeof x === 'object'){
+      ['subj','subjectId'].forEach(k => {
+        if(typeof x[k] === 'string' && x[k]) x[k] = fixId(x[k]);
+      });
+    }
+  }));
+
+  // el embed de música solo puede apuntar a los reproductores permitidos
+  if(st.musicEmbed){
+    const url = (st.musicEmbed && typeof st.musicEmbed === 'object') ? String(st.musicEmbed.embedUrl || '') : '';
+    if(!EMBED_HOSTS_RE.test(url)) st.musicEmbed = null;
+    else st.musicEmbed = {
+      platform: safeStr(st.musicEmbed.platform, 20),
+      embedUrl: url.slice(0, 500),
+      height: Math.min(400, Math.max(60, parseInt(st.musicEmbed.height) || 120))
+    };
+  }
+  return st;
+}
+
 const DEFAULT_STATE = () => ({
   v: 1, // versión del esquema de datos (para migraciones futuras)
   subjects: [],
@@ -2096,10 +2201,7 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return false;
     const parsed = JSON.parse(raw);
-    STATE = {...DEFAULT_STATE(), ...parsed};
-    if(!STATE.notes) STATE.notes = {};
-    if(!STATE.sessionLogs) STATE.sessionLogs = [];
-    if(!STATE.iaMessages) STATE.iaMessages = [];
+    STATE = sanitizeState(parsed);
     // Reset weekly tracked time if new week
     const currentWeek = getWeekKey(new Date());
     if(STATE.trackedWeek !== currentWeek){
@@ -2346,17 +2448,17 @@ function buildPDFHTML(scope, data){
           const b = it.item; const sub = subjMap[b.subj];
           body += `<tr>
             <td class="time">${String(b.startH).padStart(2,'0')}–${String(b.endH).padStart(2,'0')}h</td>
-            <td><span class="dot" style="background:${sub?.color||'#999'}"></span><strong>${b.title}</strong> <span class="sub">${sub?.name||''} · ${b.type}</span></td>
+            <td><span class="dot" style="background:${sub?.color||'#999'}"></span><strong>${esc(b.title)}</strong> <span class="sub">${sub?.name||''} · ${b.type}</span></td>
           </tr>`;
         } else {
           const e = it.item; const sub = subjMap[e.subj];
           const notesLine = (e.notes && e.notes.trim())
-            ? `<div class="ev-extra ev-notes">${e.notes.replace(/\n/g,'<br>')}</div>` : '';
+            ? `<div class="ev-extra ev-notes">${esc(e.notes).replace(/\n/g,'<br>')}</div>` : '';
           const linksLine = (e.links && e.links.length)
-            ? `<div class="ev-extra">enlaces: ${e.links.map(l => l.url).join(' · ')}</div>` : '';
+            ? `<div class="ev-extra">enlaces: ${esc(e.links.map(l => l.url).join(' · '))}</div>` : '';
           body += `<tr>
             <td class="time">${e.type}</td>
-            <td><span class="dot" style="background:${sub?.color||'#999'}"></span><strong>${e.title}</strong> <span class="sub">${sub?.name||''}</span>${notesLine}${linksLine}</td>
+            <td><span class="dot" style="background:${sub?.color||'#999'}"></span><strong>${esc(e.title)}</strong> <span class="sub">${sub?.name||''}</span>${notesLine}${linksLine}</td>
           </tr>`;
         }
       });
@@ -2364,7 +2466,7 @@ function buildPDFHTML(scope, data){
     }
     // Note for today
     const ds = fmtDate(today);
-    if(STATE.notes[ds]) body += `<div class="note"><strong>nota:</strong> ${STATE.notes[ds]}</div>`;
+    if(STATE.notes[ds]) body += `<div class="note"><strong>nota:</strong> ${esc(STATE.notes[ds])}</div>`;
   }
 
   if(scope === 'week'){
@@ -2387,7 +2489,7 @@ function buildPDFHTML(scope, data){
           if(isStart){
             const span = b.endH - b.startH;
             body += `<td rowspan="${span}" class="block ${b.type}" style="border-left:3px solid ${sub?.color||'#999'}">
-              <strong>${b.title}</strong><br><small>${sub?.name||''}</small>
+              <strong>${esc(b.title)}</strong><br><small>${sub?.name||''}</small>
             </td>`;
           }
         } else {
@@ -2405,11 +2507,11 @@ function buildPDFHTML(scope, data){
         const sub = subjMap[e.subj];
         const d = parseDate(e.date);
         const linksHtml = (e.links && e.links.length)
-          ? `<div class="ev-extra">enlaces: ${e.links.map(l => l.url).join(' · ')}</div>` : '';
+          ? `<div class="ev-extra">enlaces: ${esc(e.links.map(l => l.url).join(' · '))}</div>` : '';
         const notesHtml = (e.notes && e.notes.trim())
-          ? `<div class="ev-extra ev-notes">${e.notes.replace(/\n/g,'<br>')}</div>` : '';
+          ? `<div class="ev-extra ev-notes">${esc(e.notes).replace(/\n/g,'<br>')}</div>` : '';
         body += `<li><span class="dot" style="background:${sub?.color||'#999'}"></span>
-          <strong>${d.getDate()}/${d.getMonth()+1}</strong> · ${e.type} · ${e.title} <span class="sub">(${sub?.name||''})</span>
+          <strong>${d.getDate()}/${d.getMonth()+1}</strong> · ${e.type} · ${esc(e.title)} <span class="sub">(${sub?.name||''})</span>
           ${e.done ? '<span class="done-mark">✓</span>' : ''}
           ${notesHtml}${linksHtml}</li>`;
       });
@@ -2437,9 +2539,9 @@ function buildPDFHTML(scope, data){
         <div class="cal-num">${d}</div>
         ${evs.map(e => {
           const sub = subjMap[e.subj];
-          return `<div class="cal-ev" style="background:${sub?.color||'#999'};${e.done?'opacity:.5;text-decoration:line-through':''}">${e.title}</div>`;
+          return `<div class="cal-ev" style="background:${sub?.color||'#999'};${e.done?'opacity:.5;text-decoration:line-through':''}">${esc(e.title)}</div>`;
         }).join('')}
-        ${note ? `<div class="cal-note">✎ ${note.substring(0,30)}${note.length>30?'…':''}</div>` : ''}
+        ${note ? `<div class="cal-note">✎ ${esc(note.substring(0,30))}${note.length>30?'…':''}</div>` : ''}
       </td>`;
       col++;
     }
@@ -2452,16 +2554,16 @@ function buildPDFHTML(scope, data){
     STATE.subjects.forEach(sub => {
       const subjEvs = data.events.filter(e => e.subj === sub.id).sort((a,b) => parseDate(a.date)-parseDate(b.date));
       body += `<div class="subj-section">
-        <h3><span class="dot" style="background:${sub.color}"></span>${sub.name} <span class="sub">(${sub.progress}%)</span></h3>`;
+        <h3><span class="dot" style="background:${sub.color}"></span>${esc(sub.name)} <span class="sub">(${sub.progress}%)</span></h3>`;
       if(subjEvs.length){
         body += `<ul class="ev-list">`;
         subjEvs.forEach(e => {
           const d = parseDate(e.date);
           const linksHtml = (e.links && e.links.length)
-            ? `<div class="ev-extra">enlaces: ${e.links.map(l => l.url).join(' · ')}</div>` : '';
+            ? `<div class="ev-extra">enlaces: ${esc(e.links.map(l => l.url).join(' · '))}</div>` : '';
           const notesHtml = (e.notes && e.notes.trim())
-            ? `<div class="ev-extra ev-notes">${e.notes.replace(/\n/g,'<br>')}</div>` : '';
-          body += `<li><strong>${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}</strong> · ${e.type} · ${e.title}
+            ? `<div class="ev-extra ev-notes">${esc(e.notes).replace(/\n/g,'<br>')}</div>` : '';
+          body += `<li><strong>${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}</strong> · ${e.type} · ${esc(e.title)}
             ${e.done ? '<span class="done-mark">✓</span>' : ''}
             ${notesHtml}${linksHtml}</li>`;
         });
@@ -2475,7 +2577,7 @@ function buildPDFHTML(scope, data){
     // Weekly plan
     if(STATE.weeklyPlan && STATE.weeklyPlan.weekly_plan && STATE.weeklyPlan.weekly_plan.length){
       body += `<h2>plan de trabajo</h2>`;
-      if(STATE.weeklyPlan.summary) body += `<p class="summary">${STATE.weeklyPlan.summary}</p>`;
+      if(STATE.weeklyPlan.summary) body += `<p class="summary">${esc(STATE.weeklyPlan.summary)}</p>`;
       STATE.weeklyPlan.weekly_plan.forEach(w => {
         body += `<div class="plan-week-pdf">
           <h4>semana ${w.week_label || w.week}</h4>`;
@@ -2484,7 +2586,7 @@ function buildPDFHTML(scope, data){
           w.sessions.forEach(s => {
             const sub = subjMap[s.subject];
             body += `<li><span class="dot" style="background:${sub?.color||'#999'}"></span>
-              <strong>${sub?.name||s.subject}</strong> · ${s.hours}h — ${s.task||''}</li>`;
+              <strong>${esc(sub?.name||s.subject)}</strong> · ${s.hours}h — ${esc(s.task||'')}</li>`;
           });
           body += `</ul>`;
         }
@@ -2569,6 +2671,8 @@ ${body}
 // Old simple export (kept for backwards compat from importData)
 function exportData(){ openExportModal(); }
 
+let pendingImportData = null;
+
 function importData(e){
   const file = e.target.files[0];
   if(!file) return;
@@ -2576,17 +2680,37 @@ function importData(e){
   reader.onload = ev => {
     try{
       const data = JSON.parse(ev.target.result);
-      STATE = {...DEFAULT_STATE(), ...data};
-      saveState();
-      renderAll();
+      if(!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('shape');
+      pendingImportData = data;
+      const nIn = Array.isArray(data.subjects) ? data.subjects.length : 0;
+      const eIn = Array.isArray(data.events) ? data.events.length : 0;
+      document.getElementById('imp-sum-in').textContent =
+        `${nIn} asignatura${nIn === 1 ? '' : 's'} y ${eIn} evento${eIn === 1 ? '' : 's'}`;
+      document.getElementById('imp-sum-cur').textContent =
+        `${STATE.subjects.length} asignatura${STATE.subjects.length === 1 ? '' : 's'} y ${STATE.events.length} evento${STATE.events.length === 1 ? '' : 's'}`;
       closeMenu();
-      showToast('plan importado');
+      document.getElementById('modal-import').classList.add('open');
     }catch(err){
       showToast('archivo inválido');
     }
   };
   reader.readAsText(file);
   e.target.value = '';
+}
+
+function confirmImportNow(){
+  if(!pendingImportData) return;
+  // copia de seguridad del plan actual antes de sustituirlo
+  try{
+    const cur = localStorage.getItem(STORAGE_KEY);
+    if(cur) localStorage.setItem(STORAGE_KEY + '_backup_pre_import', cur);
+  }catch(_){}
+  STATE = sanitizeState(pendingImportData);
+  pendingImportData = null;
+  saveState();
+  renderAll();
+  closeModalForce('modal-import');
+  showToast('plan importado · copia previa guardada en este navegador');
 }
 
 function openPrivacy(){
@@ -2886,7 +3010,7 @@ function renderSidebar(){
     const th = tracked > 0 ? `${(tracked/60).toFixed(1)}h` : '';
     return `<div class="subj-item ${selectedSubjId===s.id?'active':''}" onclick="setSubjFilter('${s.id}')" style="animation-delay:${0.04 + i*0.03}s">
       <div class="subj-dot" style="background:${s.color}"></div>
-      <span class="subj-name">${s.name}</span>
+      <span class="subj-name">${esc(s.name)}</span>
       ${th ? `<span class="subj-time">${th}</span>` : ''}
       <button class="subj-detail-btn" onclick="event.stopPropagation();openSubjectDetail('${s.id}')" title="ver ficha">→</button>
     </div>`;
@@ -3098,7 +3222,7 @@ function openSubjectDetail(id){
         const wLabel = (ev.weight !== null && ev.weight !== undefined) ? `${ev.weight}%` : '—';
         const gradeClass = ev.grade >= 5 ? 'pass' : 'fail';
         body += `<div class="grade-item" onclick="closeSubjectDetail();setTimeout(()=>editEvent(${idx}),200)">
-          <div class="grade-item-name">${ev.title}</div>
+          <div class="grade-item-name">${esc(ev.title)}</div>
           <div class="grade-item-weight">${wLabel}</div>
           <div class="grade-item-score ${gradeClass}">${fmtGrade(ev.grade)}</div>
         </div>`;
@@ -3173,7 +3297,7 @@ function openSubjectDetail(id){
       body += `<div class="subj-detail-ev" onclick="closeSubjectDetail();setTimeout(()=>editEvent(${idx}),200)">
         <div class="subj-detail-ev-date">${dateStr}</div>
         <div class="subj-detail-ev-body">
-          <div class="subj-detail-ev-title">${ev.title}</div>
+          <div class="subj-detail-ev-title">${esc(ev.title)}</div>
           <div class="subj-detail-ev-meta">
             <span>${ev.type}</span>
             ${ev.notes ? '<span class="subj-detail-ev-meta-icon">✎</span>' : ''}
@@ -3216,10 +3340,10 @@ function openSubjectDetail(id){
       const removeBtn = l.contextType === 'subject'
         ? `<button class="subj-detail-link-remove" onclick="event.stopPropagation();removeSubjectLink('${id}',${l.subjLinkIdx})" title="quitar">×</button>`
         : '';
-      body += `<div class="subj-detail-link" onclick="${l.type==='folder'?`navigator.clipboard.writeText('${l.url.replace(/'/g,"\\\\'")}');showToast('ruta copiada')`:`window.open('${l.url}', '_blank')`}" title="${l.url.replace(/"/g,'&quot;')}">
+      body += `<div class="subj-detail-link" onclick="${l.type==='folder'?`navigator.clipboard.writeText(${escJsAttr(l.url)});showToast('ruta copiada')`:(safeHttpUrl(l.url)?`window.open(${escJsAttr(safeHttpUrl(l.url))}, '_blank', 'noopener')`:`showToast('enlace no válido')`)}" title="${esc(l.url)}">
         <span class="subj-detail-link-icon">${info.icon}</span>
-        <span class="subj-detail-link-text">${info.label}</span>
-        <span class="subj-detail-link-context">${l.contextTitle}</span>
+        <span class="subj-detail-link-text">${esc(info.label)}</span>
+        <span class="subj-detail-link-context">${esc(l.contextTitle)}</span>
         ${removeBtn}
       </div>`;
     });
@@ -3271,8 +3395,8 @@ function openSubjectDetail(id){
         ? `<button class="subj-detail-note-remove" onclick="removeSubjectNote('${id}',${n.subjNoteIdx})" title="quitar">×</button>`
         : '';
       body += `<div class="subj-detail-note">
-        <div class="subj-detail-note-meta">${icon} ${n.label} · ${dateStr}${removeBtn}</div>
-        <div class="subj-detail-note-text">${n.text.replace(/\n/g,'<br>')}</div>
+        <div class="subj-detail-note-meta">${icon} ${esc(n.label)} · ${dateStr}${removeBtn}</div>
+        <div class="subj-detail-note-text">${esc(n.text).replace(/\n/g,'<br>')}</div>
       </div>`;
     });
     body += `</div>`;
@@ -3329,7 +3453,7 @@ function openSubjectDetail(id){
       body += `<div class="subj-detail-ev ${ev.done?'done':''}" onclick="closeSubjectDetail();setTimeout(()=>editEvent(${idx}),200)">
         <div class="subj-detail-ev-date">${dateStr}</div>
         <div class="subj-detail-ev-body">
-          <div class="subj-detail-ev-title">${ev.title}</div>
+          <div class="subj-detail-ev-title">${esc(ev.title)}</div>
           <div class="subj-detail-ev-meta"><span>${ev.type}</span></div>
         </div>
         <div class="subj-detail-tag">${ev.done?'hecho':'pasado'}</div>
@@ -3370,7 +3494,7 @@ function renderTrackedList(){
     return `<div style="margin-bottom:9px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
         <div style="display:flex;align-items:center;gap:6px;font-size:10px">
-          <div class="subj-dot" style="background:${s.color};width:6px;height:6px"></div>${s.name}
+          <div class="subj-dot" style="background:${s.color};width:6px;height:6px"></div>${esc(s.name)}
         </div>
         <div style="font-size:9px;color:var(--g400);font-variant-numeric:tabular-nums">${label}</div>
       </div>
@@ -3521,7 +3645,7 @@ function renderSubjPicker(){
   list.innerHTML = STATE.subjects.map(s => `
     <div class="subj-picker-item" onclick="startSessionWithSubj('${s.id}')">
       <div class="subj-dot" style="background:${s.color}"></div>
-      <span>${s.name}</span>
+      <span>${esc(s.name)}</span>
     </div>`).join('');
 }
 
@@ -3597,10 +3721,10 @@ function renderSessionLog(){
       <div class="session-log-dot" style="background:${sub?.color || '#999'}"></div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px">
-          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.label}</span>
+          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.label)}</span>
           <span class="session-log-time">+${l.minutes}min</span>
         </div>
-        ${l.note ? `<div class="session-log-note" title="${l.note}">"${l.note}"</div>` : ''}
+        ${l.note ? `<div class="session-log-note" title="${esc(l.note)}">"${esc(l.note)}"</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -3718,9 +3842,9 @@ function renderHoy(){
       <div class="hoy-card-lbl">próxima entrega</div>
       <div class="hoy-deadline-big ${isUrgent?'urgent':''}">${big}</div>
       <div class="hoy-deadline-sub" style="color:${nextSub?.color || 'var(--g600)'}">
-        ${sub ? sub + ' · ' : ''}${nextSub?.name || ''}
+        ${sub ? sub + ' · ' : ''}${esc(nextSub?.name || '')}
       </div>
-      <div class="hoy-deadline-extra">${next.title}</div>
+      <div class="hoy-deadline-extra">${esc(next.title)}</div>
     </div>`;
   } else {
     html += `<div class="hoy-card">
@@ -3767,8 +3891,8 @@ function renderHoy(){
           <div class="hoy-item-color" style="background:${sub?.color || 'var(--g300)'}"></div>
           <div class="hoy-item-time" style="${isCurrent?'color:var(--urgent);font-weight:600':isPast?'opacity:.5':''}">${time}</div>
           <div class="hoy-item-body">
-            <div class="hoy-item-title">${b.title}</div>
-            <div class="hoy-item-sub">${sub?.name || b.subj} · ${b.type}</div>
+            <div class="hoy-item-title">${esc(b.title)}</div>
+            <div class="hoy-item-sub">${esc(sub?.name || b.subj)} · ${b.type}</div>
           </div>
           <div class="hoy-check ${b.done?'checked':''}">${b.done?'✓':''}</div>
         </div>`;
@@ -3780,8 +3904,8 @@ function renderHoy(){
           <div class="hoy-item-color" style="background:${sub?.color || 'var(--g300)'}"></div>
           <div class="hoy-item-time">${e.type}</div>
           <div class="hoy-item-body">
-            <div class="hoy-item-title">${e.title}</div>
-            <div class="hoy-item-sub">${sub?.name || e.subj}</div>
+            <div class="hoy-item-title">${esc(e.title)}</div>
+            <div class="hoy-item-sub">${esc(sub?.name || e.subj)}</div>
           </div>
           <div class="hoy-check ${e.done?'checked':''}">${e.done?'✓':''}</div>
         </div>`;
@@ -3813,7 +3937,7 @@ function renderHoy(){
         <div class="hoy-item-color" style="background:var(--g300)"></div>
         <div class="hoy-item-time">${i+1}</div>
         <div class="hoy-item-body">
-          <div class="hoy-item-title">${step}</div>
+          <div class="hoy-item-title">${esc(step)}</div>
         </div>
         <div class="hoy-check ${done?'checked':''}">${done?'✓':''}</div>
       </div>`;
@@ -3950,7 +4074,7 @@ function renderWeek(){
         style="top:${eventY}px;background:${sub?.color || 'var(--g600)'};
         ${ev.done?'opacity:.5;text-decoration:line-through':''}"
         onclick="event.stopPropagation();editEvent(${evIdx})"
-        title="${ev.title} · arrastra para cambiar de día">${isE?'⬡ ':''}${ev.title}</div>`;
+        title="${esc(ev.title)} · arrastra para cambiar de día">${isE?'⬡ ':''}${esc(ev.title)}</div>`;
       eventY += 16;
     });
 
@@ -3966,7 +4090,7 @@ function renderWeek(){
         style="top:${top + Math.max(eventY-6,0)}px;height:${height-2}px;border-left-color:${sub?.color || 'var(--g300)'}"
         onclick="event.stopPropagation();editScheduleBlock(${idx})">
         <div class="sched-resize-handle sched-resize-top" data-resize="top"></div>
-        <div class="sched-block-title">${b.title}</div>
+        <div class="sched-block-title">${esc(b.title)}</div>
         ${height >= 60 ? `<div class="sched-block-sub">${b.endH-b.startH}h</div>` : ''}
         <div class="sched-resize-handle sched-resize-bottom" data-resize="bottom"></div>
       </div>`;
@@ -4265,7 +4389,7 @@ function renderCalendar(){
         <div class="cal-cell-head">
           <div class="cal-date" onclick="event.stopPropagation();goToDay('${ds}')" title="ver día">${dayNum}</div>
           <button class="cal-note-btn" onclick="event.stopPropagation();openNote('${ds}')" 
-            title="${note ? note.replace(/"/g,'&quot;') : 'añadir nota'}">
+            title="${note ? esc(note) : 'añadir nota'}">
             ${note ? '✎' : '+'}
           </button>
         </div>
@@ -4273,7 +4397,7 @@ function renderCalendar(){
           const s = getSub(ev.subj);
           const evIdx = STATE.events.indexOf(ev);
           return `<div class="cal-ev ${ev.done?'done':''}" style="background:${s?.color || '#aaa'}"
-            onclick="event.stopPropagation();editEvent(${evIdx})">${ev.title}</div>`;
+            onclick="event.stopPropagation();editEvent(${evIdx})">${esc(ev.title)}</div>`;
         }).join('')}
         ${evs.length > 2 ? `<div style="font-size:7.5px;color:var(--g400)">+${evs.length-2} más</div>` : ''}
         ${steps.slice(0,2).map(st => `<div class="cal-step">${st}</div>`).join('')}
@@ -4341,7 +4465,7 @@ function showDayDetail(dateStr){
   if(note){
     body += `<div class="day-detail-section">
       <div class="day-detail-lbl">nota</div>
-      <div class="day-detail-note">${note}</div>
+      <div class="day-detail-note">${esc(note)}</div>
     </div>`;
   }
 
@@ -4365,8 +4489,8 @@ function showDayDetail(dateStr){
           <div class="day-detail-color" style="background:${sub?.color || 'var(--g300)'}"></div>
           <div class="day-detail-time">${time}</div>
           <div class="day-detail-body">
-            <div class="day-detail-title">${b.title}</div>
-            <div class="day-detail-sub">${sub?.name || b.subj} · ${b.type}</div>
+            <div class="day-detail-title">${esc(b.title)}</div>
+            <div class="day-detail-sub">${esc(sub?.name || b.subj)} · ${b.type}</div>
           </div>
           <div class="hoy-check ${b.done?'checked':''}">${b.done?'✓':''}</div>
         </div>`;
@@ -4378,8 +4502,8 @@ function showDayDetail(dateStr){
           <div class="day-detail-color" style="background:${sub?.color || 'var(--g300)'}"></div>
           <div class="day-detail-time">${e.type}</div>
           <div class="day-detail-body">
-            <div class="day-detail-title">${e.title}</div>
-            <div class="day-detail-sub">${sub?.name || e.subj} · clic para editar</div>
+            <div class="day-detail-title">${esc(e.title)}</div>
+            <div class="day-detail-sub">${esc(sub?.name || e.subj)} · clic para editar</div>
           </div>
           <div class="hoy-check ${e.done?'checked':''}" onclick="event.stopPropagation();toggleEventDoneFromModal(${idx})">${e.done?'✓':''}</div>
         </div>`;
@@ -4465,7 +4589,7 @@ function renderGantt(){
   const evs = filteredEvents();
   if(!evs.length){
     const filterNote = selectedSubjId
-      ? `<div class="gantt-empty-sub">tienes filtrada la asignatura "<strong>${getSub(selectedSubjId)?.name || selectedSubjId}</strong>" y no tiene eventos.<br>quita el filtro tocando "todas" en el panel de asignaturas.</div>`
+      ? `<div class="gantt-empty-sub">tienes filtrada la asignatura "<strong>${esc(getSub(selectedSubjId)?.name || selectedSubjId)}</strong>" y no tiene eventos.<br>quita el filtro tocando "todas" en el panel de asignaturas.</div>`
       : (STATE.events.length
           ? `<div class="gantt-empty-sub">hay ${STATE.events.length} evento(s) y ${STATE.subjects.length} asignatura(s) pero no se pudieron mostrar.<br>recarga la página o pídele a la ia que reorganice tu plan.</div>`
           : `<div class="gantt-empty-sub">no hay eventos todavía. habla con la ia para configurar tu cuatrimestre,<br>o crea entregas y exámenes manualmente.</div>`);
@@ -4572,7 +4696,7 @@ function renderGantt(){
     labelCol += `<div style="height:${ROW_H_SUBJ}px;border-bottom:1px solid var(--g200);background:var(--g100);
       display:flex;align-items:center;gap:7px;padding:0 10px">
       <div style="width:8px;height:8px;border-radius:50%;background:${sub.color};flex-shrink:0"></div>
-      <span style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub.name}</span>
+      <span style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(sub.name)}</span>
     </div>`;
     phases.forEach((ph, pi) => {
       labelCol += `<div style="height:${ROW_H_PHASE}px;border-bottom:1px solid #f0f0ec;
@@ -4643,7 +4767,7 @@ function renderGantt(){
       const px = ((parseDate(ev.date) - SEM_START)/(7*864e5))*WW;
       const isE = ev.type === 'examen';
       const evIdx = STATE.events.indexOf(ev);
-      timelineCol += `<div title="${sub.name}: ${ev.title} (${ev.date})"
+      timelineCol += `<div title="${esc(sub.name)}: ${esc(ev.title)} (${ev.date})"
         style="position:absolute;top:50%;transform:translateY(-50%)${isE?' rotate(45deg)':''};
         left:${px-5}px;width:10px;height:10px;background:${sub.color};z-index:4;cursor:pointer;
         border-radius:${isE?'2px':'3px'};box-shadow:0 0 0 2px var(--white);${ev.done?'opacity:.4':''}"
@@ -4772,7 +4896,7 @@ function fmtGrade(g){
 
 function populateSubjectSelect(id, selected){
   const sel = document.getElementById(id);
-  let html = STATE.subjects.map(s => `<option value="${s.id}" ${s.id===selected?'selected':''}>${s.name}</option>`).join('');
+  let html = STATE.subjects.map(s => `<option value="${s.id}" ${s.id===selected?'selected':''}>${esc(s.name)}</option>`).join('');
   // If the requested 'selected' value is not in current subjects, add it as a preserved option
   // so it doesn't get accidentally clobbered by the dropdown defaulting to the first item.
   if(selected && !STATE.subjects.some(s => s.id === selected)){
@@ -4851,7 +4975,9 @@ function clickLink(idx){
       showToast('no se pudo copiar');
     });
   } else {
-    window.open(l.url, '_blank', 'noopener');
+    const u = safeHttpUrl(l.url);
+    if(u) window.open(u, '_blank', 'noopener');
+    else showToast('enlace no válido');
   }
 }
 
@@ -4863,10 +4989,10 @@ function renderEventLinks(){
   }
   list.innerHTML = pendingLinks.map((l, i) => {
     const info = getLinkInfo(l);
-    return `<div class="link-item" onclick="clickLink(${i})" title="${l.url.replace(/"/g,'&quot;')}">
+    return `<div class="link-item" onclick="clickLink(${i})" title="${esc(l.url)}">
       <span class="link-icon">${info.icon}</span>
       <div style="flex:1;min-width:0;display:flex;flex-direction:column">
-        <div class="link-text">${info.label}</div>
+        <div class="link-text">${esc(info.label)}</div>
         <div class="link-host">${info.host}</div>
       </div>
       <button class="link-remove" onclick="event.stopPropagation();removeLink(${i})">×</button>
@@ -5028,7 +5154,9 @@ function clickSchLink(idx){
       showToast('no se pudo copiar');
     });
   } else {
-    window.open(l.url, '_blank', 'noopener');
+    const u = safeHttpUrl(l.url);
+    if(u) window.open(u, '_blank', 'noopener');
+    else showToast('enlace no válido');
   }
 }
 
@@ -5040,10 +5168,10 @@ function renderSchLinks(){
   }
   list.innerHTML = pendingSchLinks.map((l, i) => {
     const info = getLinkInfo(l);
-    return `<div class="link-item" onclick="clickSchLink(${i})" title="${l.url.replace(/"/g,'&quot;')}">
+    return `<div class="link-item" onclick="clickSchLink(${i})" title="${esc(l.url)}">
       <span class="link-icon">${info.icon}</span>
       <div style="flex:1;min-width:0;display:flex;flex-direction:column">
-        <div class="link-text">${info.label}</div>
+        <div class="link-text">${esc(info.label)}</div>
         <div class="link-host">${info.host}</div>
       </div>
       <button class="link-remove" onclick="event.stopPropagation();removeSchLink(${i})">×</button>
@@ -5289,7 +5417,7 @@ function renderChips(){
     return `
     <div class="file-chip ${statusClass}">
       <span class="chip-icon">${icon}</span>
-      <span class="chip-name" title="${f.name}">${f.name}${extra}</span>
+      <span class="chip-name" title="${esc(f.name)}">${esc(f.name)}${extra}</span>
       <button class="chip-remove" onclick="removeFile(${i})">×</button>
     </div>`;
   }).join('');
@@ -5595,7 +5723,7 @@ async function sendMsg(){
       }
 
       if(apiError){
-        bubbleContent.innerHTML = `error de la api: ${apiError}`;
+        bubbleContent.innerHTML = `error de la api: ${esc(apiError)}`;
         STATE.iaMessages.pop();
         saveState();
         throw new Error('API error');
@@ -5675,7 +5803,7 @@ function liveDisplay(text){
   if(openFence !== -1){
     d = d.slice(0, openFence) + '\u200B';
   }
-  d = d
+  d = esc(d)
     .replace(/\u200B/g, '<em style="opacity:.6">[actualizando plan...]</em>')
     .replace(/\n/g, '<br>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -5691,14 +5819,14 @@ function computeFinalDisplay(reply, imported){
   if(!display || display === '[plan actualizado \u2726]'){
     display = imported ? '\u2726 plan actualizado' : reply.trim();
   }
-  return display.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  return esc(display).replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 }
 
 function addBubble(role, text){
   const c = document.getElementById('ia-msgs');
   const div = document.createElement('div');
   div.className = `ia-msg ${role}`;
-  const fmt = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  const fmt = esc(text).replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   div.innerHTML = `<div class="ia-msg-lbl">${role==='assistant'?'plan ia':'tú'}</div><div class="ia-bubble">${fmt}</div>`;
   c.appendChild(div);
   c.scrollTop = c.scrollHeight;
@@ -5733,18 +5861,18 @@ function importAIPlan(txt){
 
     if(data.subjects && Array.isArray(data.subjects)){
       data.subjects.forEach(ds => {
-        const id = ds.id || ds.subject;
-        if(!id) return;
+        const id = String(ds.id || ds.subject || '');
+        if(!id || !SAFE_ID_RE.test(id)) return;
         const tg = (ds.target_grade != null && !isNaN(ds.target_grade)) ? Math.min(10, Math.max(0, parseFloat(ds.target_grade))) : null;
         const ex = getSub(id);
         if(ex){
           if(ds.weekly_hours != null) ex.weeklyHours = ds.weekly_hours;
           if(ds.progress != null) ex.progress = ds.progress;
           if(ds.name) ex.name = ds.name;
-          if(ds.color) ex.color = ds.color;
+          if(ds.color) ex.color = safeColor(ds.color);
           if(tg != null) ex.targetGrade = tg;
         } else {
-          const color = ds.color || SUBJECT_COLORS[STATE.subjects.length % SUBJECT_COLORS.length];
+          const color = ds.color ? safeColor(ds.color) : SUBJECT_COLORS[STATE.subjects.length % SUBJECT_COLORS.length];
           STATE.subjects.push({
             id, name: ds.name || id, color,
             progress: ds.progress || 0,
@@ -6144,7 +6272,7 @@ function renderWeekConflictBanner(){
   const items = conflicts.events.map(e => {
     const sub = getSub(e.subj);
     const d = parseDate(e.date);
-    return `${e.type === 'examen' ? '⬡' : '●'} ${e.title} (${d.getDate()}/${d.getMonth()+1})`;
+    return `${e.type === 'examen' ? '⬡' : '●'} ${esc(e.title)} (${d.getDate()}/${d.getMonth()+1})`;
   }).join(' · ');
   const word = conflicts.level === 'high' ? 'sobrecarga importante' : 'múltiples entregas';
   return `<div class="conflict-banner ${conflicts.level==='high'?'high':''}">
@@ -6463,9 +6591,9 @@ function detectMusicEmbed(url){
     const isPlaylist = url.includes('list=');
     const playlistMatch = url.match(/list=([a-zA-Z0-9_-]+)/);
     if(isPlaylist && playlistMatch){
-      return {platform:'youtube', embedUrl:`https://www.youtube.com/embed/videoseries?list=${playlistMatch[1]}`, height: 220};
+      return {platform:'youtube', embedUrl:`https://www.youtube-nocookie.com/embed/videoseries?list=${playlistMatch[1]}`, height: 220};
     }
-    return {platform:'youtube', embedUrl:`https://www.youtube.com/embed/${m[1]}`, height: 220};
+    return {platform:'youtube', embedUrl:`https://www.youtube-nocookie.com/embed/${m[1]}`, height: 220};
   }
 
   // SoundCloud
@@ -6508,8 +6636,17 @@ function renderMusic(){
     return;
   }
   const e = STATE.musicEmbed;
-  wrap.innerHTML = `<iframe src="${e.embedUrl}" height="${e.height}"
+  // normalizar embeds antiguos de youtube y verificar el host permitido
+  const src = String(e.embedUrl || '').replace('://www.youtube.com/embed', '://www.youtube-nocookie.com/embed');
+  if(!EMBED_HOSTS_RE.test(src)){
+    STATE.musicEmbed = null; saveState();
+    wrap.innerHTML = `<div class="music-empty">tu música aparecerá aquí.<br>spotify · youtube · soundcloud</div>`;
+    actions.style.display = 'none';
+    return;
+  }
+  wrap.innerHTML = `<iframe src="${src}" height="${Math.min(400, Math.max(60, parseInt(e.height) || 120))}"
     allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+    referrerpolicy="strict-origin-when-cross-origin" title="reproductor de música"
     loading="lazy"></iframe>`;
   actions.style.display = 'flex';
 }
@@ -6547,7 +6684,7 @@ function renderChangelog(){
     const icon = c.action === 'add' ? '+' : c.action === 'delete' ? '−' : c.action === 'update' ? '↻' : '✓';
     return `<div class="ia-changelog-item">
       <span class="ia-changelog-icon">${icon}</span>
-      <span style="flex:1">${c.summary}</span>
+      <span style="flex:1">${esc(c.summary)}</span>
       <span class="ia-changelog-time">${agoStr}</span>
     </div>`;
   }).join('');
