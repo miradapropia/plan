@@ -4,7 +4,7 @@ Esta carpeta contiene los recursos del modo ambiente (video lofi de fondo + post
 
 ## archivos
 
-> estado actual: el `lofi.mp4` publicado en la release v1.0.0 pesa ~279 MB, por encima del objetivo de 50-150 MB. cuando puedas, re-encódalo con la receta de optimización de abajo y publícalo como asset nuevo.
+> estado actual (2026-07-21): `lofi-v2.mp4` (~10 MB, H.264 720p, crf 26, sin audio) vive en esta carpeta y se sirve desde Netlify (`AMBIENT_VIDEO = 'ambient/lofi-v2.mp4'`). sustituye a la antigua release de ~279 MB, ya no usada. el póster es `lofi-poster-v2.jpg` (~106 KB, 1280×720).
 
 - `lofi.mp4` — video que se reproduce en bucle como fondo del modo ambiente. Recomendado: H.264, 1080p, 1-2 Mbps, **sin audio**, duración 10-15 min en bucle suave. Tamaño objetivo: ~50-150 MB.
 - `lofi-poster.png` — primera frame del video. Se usa cuando el usuario tiene `prefers-reduced-motion` activado o cuando el video aún no se ha cargado. JPG 1920×1080, 80% calidad, ~200-400 KB.

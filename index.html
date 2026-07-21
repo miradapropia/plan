@@ -1274,7 +1274,7 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
   .ambient-video{display:none}
   .ambient-bg{background:linear-gradient(135deg,#1c1c1e 0%,#131315 100%)}
   .ambient-bg::before{content:'';position:absolute;inset:0;
-    background-image:url('ambient/lofi-poster.png');background-size:cover;background-position:center;background-color:#1d1d1f}
+    background-image:url('ambient/lofi-poster-v2.jpg');background-size:cover;background-position:center;background-color:#1d1d1f}
 }
 
 
@@ -1330,7 +1330,7 @@ body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='
 <div class="ambient-bg" id="ambient-bg" aria-hidden="true">
   <video class="ambient-video" id="ambient-video"
     muted loop playsinline preload="none"
-    poster="ambient/lofi-poster.png">
+    poster="ambient/lofi-poster-v2.jpg">
   </video>
   <div class="ambient-scrim"></div>
 </div>
@@ -6400,8 +6400,8 @@ if(window.matchMedia){
 // ═══════════════════════════════════════════
 // AMBIENT MODE — modo concentración con video lofi
 // ═══════════════════════════════════════════
-const AMBIENT_VIDEO = 'https://github.com/miradapropia/plan/releases/download/v1.0.0/lofi.mp4';
-const AMBIENT_POSTER = 'ambient/lofi-poster.png';
+const AMBIENT_VIDEO = 'ambient/lofi-v2.mp4';
+const AMBIENT_POSTER = 'ambient/lofi-poster-v2.jpg';
 let ambientOn = false;
 let activeAmbientView = null;
 let ambientVideoLoaded = false;
