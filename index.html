@@ -515,7 +515,7 @@ body.week-dragging .sched-block:not(.dragging):not(.resizing),
 body.week-dragging .day-event-marker{pointer-events:none}
 
 .sched-block-title{font-size:9px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--g800)}
-.sched-block-sub{font-size:7.5px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--g600)}
+.sched-block-sub{font-size:9px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--g600)}
 /* clase: always dark filled card, white text — same in both themes */
 .sched-block.clase{background:rgba(29,29,31,.88);border-left:3px solid var(--ink)}
 .sched-block.clase .sched-block-title{color:var(--paper)}
@@ -540,7 +540,7 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
   50%{box-shadow:0 0 0 5px rgba(196,56,56,0)}
 }
 .now-label{position:absolute;right:4px;top:-9px;
-  font-size:7.5px;letter-spacing:.5px;color:rgba(196,56,56,.9);
+  font-size:9px;letter-spacing:.5px;color:rgba(196,56,56,.9);
   font-variant-numeric:tabular-nums;background:var(--white);padding:0 2px;line-height:1}
 
 /* event marker on day header */
@@ -591,7 +591,7 @@ html.dark .sched-block.clase{background:rgba(40,40,38,.95);border-left:3px solid
 .cal-ev{font-size:9px;padding:1px 5px;color:var(--white);font-weight:500;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;border-radius:3px;cursor:pointer}
 .cal-ev.done{opacity:.45;text-decoration:line-through}
-.cal-step{font-size:7.5px;padding:1px 4px;color:var(--g600);
+.cal-step{font-size:9px;padding:1px 4px;color:var(--g600);
   border-left:2px solid var(--g300);margin-bottom:1px;background:var(--g100);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
@@ -4481,7 +4481,7 @@ function renderCalendar(){
           return `<div class="cal-ev ${ev.done?'done':''}" style="background:${s?.color || '#aaa'}"
             onclick="event.stopPropagation();editEvent(${evIdx})">${esc(ev.title)}</div>`;
         }).join('')}
-        ${evs.length > 2 ? `<div style="font-size:7.5px;color:var(--g400)">+${evs.length-2} más</div>` : ''}
+        ${evs.length > 2 ? `<div style="font-size:9px;color:var(--g400)">+${evs.length-2} más</div>` : ''}
         ${steps.slice(0,2).map(st => `<div class="cal-step">${st}</div>`).join('')}
       </div>`;
     }
@@ -4816,7 +4816,7 @@ function renderGantt(){
     const isNow = Math.abs(w - today) < 7*864e5;
     timelineCol += `<div style="width:${WW}px;flex-shrink:0;height:100%;border-right:1px solid var(--g200);
       display:flex;align-items:center;justify-content:center;
-      font-size:7.5px;color:${isNow?'var(--black)':'var(--g400)'};font-weight:${isNow?600:400}">
+      font-size:9px;color:${isNow?'var(--black)':'var(--g400)'};font-weight:${isNow?600:400}">
       ${w.getDate()}/${w.getMonth()+1}</div>`;
   });
   timelineCol += `</div>`;
