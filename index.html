@@ -291,6 +291,10 @@ header{border-bottom:1px solid var(--g200);padding:12px 22px;
 .subj-detail-link-remove,.subj-detail-note-remove{background:none;border:none;color:var(--g300);
   cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 6px;flex-shrink:0;transition:color .15s;margin-left:auto}
 .subj-detail-link-remove:hover,.subj-detail-note-remove:hover{color:var(--urgent)}
+.subj-detail-note-actions{margin-left:auto;display:inline-flex;align-items:center;gap:2px;flex-shrink:0}
+.subj-detail-note-edit{background:none;border:none;color:var(--g300);cursor:pointer;font-size:11px;line-height:1;padding:0 3px;flex-shrink:0;transition:color .15s var(--ease)}
+.subj-detail-note-edit:hover{color:var(--ink)}
+.subj-detail-note-actions .subj-detail-note-remove{margin-left:0;padding:0 3px;font-size:13px}
 
 /* grades section */
 .grade-target-row{display:flex;align-items:center;gap:10px;padding:8px 11px;margin-bottom:10px;
@@ -3011,6 +3015,67 @@ function removeSubjectNote(subjId, idx){
   if(!sub || !sub.notes) return;
   sub.notes.splice(idx, 1);
   saveState();
+  renderAll();
+  openSubjectDetail(subjId);
+  showToast('nota quitada');
+}
+
+// ── editar/quitar cualquier nota o reflexión desde el desplegable ──
+// cada tipo vive en un sitio distinto; se escribe en el objeto real y se
+// propaga a todas las vistas (calendario, día, exports) con renderAll().
+function noteEntryTarget(kind, idx){
+  if(kind === 'subject'){ return null; } // se maneja aparte (array del sujeto)
+  if(kind === 'event')    return STATE.events[idx];
+  if(kind === 'schedule') return STATE.schedule[idx];
+  if(kind === 'session')  return STATE.sessionLogs[idx];
+  return undefined;
+}
+
+function editNoteEntry(subjId, kind, idx){
+  let current = '';
+  if(kind === 'subject'){
+    const sub = getSub(subjId);
+    if(!sub || !sub.notes || !sub.notes[idx]) return;
+    current = sub.notes[idx].text || '';
+  } else {
+    const obj = noteEntryTarget(kind, idx);
+    if(!obj) return;
+    current = (kind === 'session' ? obj.note : obj.notes) || '';
+  }
+  const val = prompt('edita la nota:', current);
+  if(val === null) return; // cancelado
+  const t = val.trim();
+  if(kind === 'subject'){
+    const sub = getSub(subjId);
+    if(!sub || !sub.notes) return;
+    if(!t) sub.notes.splice(idx, 1);      // vaciarla equivale a quitarla
+    else   sub.notes[idx].text = t;
+  } else {
+    const obj = noteEntryTarget(kind, idx);
+    if(!obj) return;
+    if(kind === 'session') obj.note = t;   // en el resto la nota es un campo:
+    else                   obj.notes = t;  // vaciarla la borra de todas las vistas
+  }
+  saveState();
+  renderAll();
+  openSubjectDetail(subjId);
+  showToast(t ? 'nota actualizada' : 'nota vaciada');
+}
+
+function clearNoteEntry(subjId, kind, idx){
+  if(!confirm('¿quitar esta nota?')) return;
+  if(kind === 'subject'){
+    const sub = getSub(subjId);
+    if(!sub || !sub.notes) return;
+    sub.notes.splice(idx, 1);
+  } else {
+    const obj = noteEntryTarget(kind, idx);
+    if(!obj) return;
+    if(kind === 'session') obj.note = '';
+    else                   obj.notes = '';
+  }
+  saveState();
+  renderAll();
   openSubjectDetail(subjId);
   showToast('nota quitada');
 }
@@ -3430,13 +3495,14 @@ function openSubjectDetail(id){
   });
   allEvs.forEach(ev => {
     if(ev.notes && ev.notes.trim()){
-      notesEntries.push({type:'event', text:ev.notes, label:ev.title, date:ev.date});
+      notesEntries.push({type:'event', evIdx: STATE.events.indexOf(ev), text:ev.notes, label:ev.title, date:ev.date});
     }
   });
   subjSchedules.forEach(b => {
     if(b.notes && b.notes.trim()){
       notesEntries.push({
         type:'schedule',
+        schIdx: STATE.schedule.indexOf(b),
         text:b.notes,
         label:`${b.title} · ${DAY_NAMES[b.day] || ''} ${b.startH}–${b.endH}h`,
         date: new Date().toISOString() // schedule blocks are recurring, use today as anchor
@@ -3444,7 +3510,7 @@ function openSubjectDetail(id){
     }
   });
   STATE.sessionLogs.filter(l => l.subjId === id && l.note && l.note.trim()).forEach(l => {
-    notesEntries.push({type:'session', text:l.note, label:`sesión de ${l.minutes}min`, date:l.date});
+    notesEntries.push({type:'session', logIdx: STATE.sessionLogs.indexOf(l), text:l.note, label:`sesión de ${l.minutes}min`, date:l.date});
   });
   // Sort by date desc
   notesEntries.sort((a,b) => parseDate(b.date) - parseDate(a.date));
@@ -3460,11 +3526,16 @@ function openSubjectDetail(id){
       const d = parseDate(n.date);
       const dateStr = `${d.getDate()}/${d.getMonth()+1}`;
       const icon = n.type === 'session' ? '◷' : n.type === 'schedule' ? '▣' : n.type === 'subject' ? '✎' : '⬡';
-      const removeBtn = n.type === 'subject'
-        ? `<button class="subj-detail-note-remove" onclick="removeSubjectNote('${id}',${n.subjNoteIdx})" title="quitar">×</button>`
-        : '';
+      const refIdx = n.type === 'subject' ? n.subjNoteIdx
+                   : n.type === 'event' ? n.evIdx
+                   : n.type === 'schedule' ? n.schIdx
+                   : n.logIdx;
+      const controls = `<span class="subj-detail-note-actions">`
+        + `<button class="subj-detail-note-edit" onclick="editNoteEntry('${id}','${n.type}',${refIdx})" title="editar">✎</button>`
+        + `<button class="subj-detail-note-remove" onclick="clearNoteEntry('${id}','${n.type}',${refIdx})" title="quitar">×</button>`
+        + `</span>`;
       body += `<div class="subj-detail-note">
-        <div class="subj-detail-note-meta">${icon} ${esc(n.label)} · ${dateStr}${removeBtn}</div>
+        <div class="subj-detail-note-meta">${icon} ${esc(n.label)} · ${dateStr}${controls}</div>
         <div class="subj-detail-note-text">${esc(n.text).replace(/\n/g,'<br>')}</div>
       </div>`;
     });
