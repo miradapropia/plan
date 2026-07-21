@@ -5404,7 +5404,16 @@ async function extractPdfText(f){
     }
 
     const arrayBuffer = await f.arrayBuffer();
-    const pdf = await window.pdfjsLib.getDocument({data: arrayBuffer}).promise;
+    // isEvalSupported:false → mitiga CVE-2024-4367 (ejecución de js arbitrario
+    // desde un pdf malicioso en pdf.js <=4.1.392) y evita que pdf.js use eval,
+    // lo que permite activar la CSP sin 'unsafe-eval'. enableScripting/enableXFA
+    // a false: no ejecutar javascript embebido en el pdf.
+    const pdf = await window.pdfjsLib.getDocument({
+      data: arrayBuffer,
+      isEvalSupported: false,
+      enableScripting: false,
+      enableXFA: false
+    }).promise;
     let fullText = '';
     const maxPages = Math.min(pdf.numPages, 40); // safety cap
     for(let p = 1; p <= maxPages; p++){
