@@ -1998,6 +1998,47 @@ body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='
 </div>
 
 <!-- MODAL: day detail -->
+<!-- MODAL: entrada de texto genérica (reemplaza prompt) -->
+<div class="modal-overlay" id="modal-input" onclick="closeModal(event,'modal-input')">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="input-modal-title">añadir</div>
+      <button class="modal-close" onclick="closeInputModal()" aria-label="cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label class="modal-field-lbl" id="input-modal-lbl"></label>
+        <textarea class="modal-textarea" id="input-modal-text" style="min-height:90px"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="modal-btn" onclick="closeInputModal()">cancelar</button>
+        <button class="modal-btn primary" id="input-modal-save" onclick="confirmInputModal()">guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: confirmación genérica (reemplaza confirm) -->
+<div class="modal-overlay" id="modal-ask" onclick="closeModal(event,'modal-ask')">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="ask-modal-title">confirmar</div>
+      <button class="modal-close" onclick="closeAskModal()" aria-label="cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="ask-modal-msg" style="font-size:12px;line-height:1.6;color:var(--g600)"></p>
+    </div>
+    <div class="modal-foot">
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="modal-btn" onclick="closeAskModal()">cancelar</button>
+        <button class="modal-btn danger" id="ask-modal-ok" onclick="confirmAskModal()">eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-day" onclick="closeModal(event,'modal-day')">
   <div class="modal" style="max-width:480px">
     <div class="modal-head">
@@ -2974,7 +3015,7 @@ function setSubjectTarget(subjId, value){
 function addSubjectLink(subjId){
   const sub = getSub(subjId);
   if(!sub) return;
-  const url = prompt('pega el enlace (url, ruta de carpeta o app link):');
+  showInputModal({title:'añadir enlace', label:'url, ruta de carpeta o app link', placeholder:'https://…   ·   /users/…   ·   figma://…', saveLabel:'añadir', onSave:(url)=>{
   if(!url || !url.trim()) return;
   const trimmed = url.trim();
   // Auto-detect type
@@ -2986,6 +3027,7 @@ function addSubjectLink(subjId){
   saveState();
   openSubjectDetail(subjId);
   showToast('enlace añadido');
+  }});
 }
 
 function removeSubjectLink(subjId, idx){
@@ -3001,13 +3043,14 @@ function removeSubjectLink(subjId, idx){
 function addSubjectNote(subjId){
   const sub = getSub(subjId);
   if(!sub) return;
-  const text = prompt('escribe una nota para esta asignatura:');
-  if(!text || !text.trim()) return;
-  if(!sub.notes) sub.notes = [];
-  sub.notes.push({text: text.trim(), date: new Date().toISOString()});
-  saveState();
-  openSubjectDetail(subjId);
-  showToast('nota añadida');
+  showInputModal({title:'añadir nota', label:'nota para esta asignatura', placeholder:'escribe una nota…', saveLabel:'añadir', onSave:(text)=>{
+    if(!text || !text.trim()) return;
+    if(!sub.notes) sub.notes = [];
+    sub.notes.push({text: text.trim(), date: new Date().toISOString()});
+    saveState();
+    openSubjectDetail(subjId);
+    showToast('nota añadida');
+  }});
 }
 
 function removeSubjectNote(subjId, idx){
@@ -3042,42 +3085,43 @@ function editNoteEntry(subjId, kind, idx){
     if(!obj) return;
     current = (kind === 'session' ? obj.note : obj.notes) || '';
   }
-  const val = prompt('edita la nota:', current);
-  if(val === null) return; // cancelado
-  const t = val.trim();
-  if(kind === 'subject'){
-    const sub = getSub(subjId);
-    if(!sub || !sub.notes) return;
-    if(!t) sub.notes.splice(idx, 1);      // vaciarla equivale a quitarla
-    else   sub.notes[idx].text = t;
-  } else {
-    const obj = noteEntryTarget(kind, idx);
-    if(!obj) return;
-    if(kind === 'session') obj.note = t;   // en el resto la nota es un campo:
-    else                   obj.notes = t;  // vaciarla la borra de todas las vistas
-  }
-  saveState();
-  renderAll();
-  openSubjectDetail(subjId);
-  showToast(t ? 'nota actualizada' : 'nota vaciada');
+  showInputModal({title:'editar nota', label:'nota', value:current, placeholder:'escribe una nota…', onSave:(val)=>{
+    const t = val.trim();
+    if(kind === 'subject'){
+      const sub = getSub(subjId);
+      if(!sub || !sub.notes) return;
+      if(!t) sub.notes.splice(idx, 1);      // vaciarla equivale a quitarla
+      else   sub.notes[idx].text = t;
+    } else {
+      const obj = noteEntryTarget(kind, idx);
+      if(!obj) return;
+      if(kind === 'session') obj.note = t;   // en el resto la nota es un campo:
+      else                   obj.notes = t;  // vaciarla la borra de todas las vistas
+    }
+    saveState();
+    renderAll();
+    openSubjectDetail(subjId);
+    showToast(t ? 'nota actualizada' : 'nota vaciada');
+  }});
 }
 
 function clearNoteEntry(subjId, kind, idx){
-  if(!confirm('¿quitar esta nota?')) return;
-  if(kind === 'subject'){
-    const sub = getSub(subjId);
-    if(!sub || !sub.notes) return;
-    sub.notes.splice(idx, 1);
-  } else {
-    const obj = noteEntryTarget(kind, idx);
-    if(!obj) return;
-    if(kind === 'session') obj.note = '';
-    else                   obj.notes = '';
-  }
-  saveState();
-  renderAll();
-  openSubjectDetail(subjId);
-  showToast('nota quitada');
+  showConfirmModal({title:'quitar nota', message:'¿quitar esta nota?', confirmLabel:'quitar', onConfirm:()=>{
+    if(kind === 'subject'){
+      const sub = getSub(subjId);
+      if(!sub || !sub.notes) return;
+      sub.notes.splice(idx, 1);
+    } else {
+      const obj = noteEntryTarget(kind, idx);
+      if(!obj) return;
+      if(kind === 'session') obj.note = '';
+      else                   obj.notes = '';
+    }
+    saveState();
+    renderAll();
+    openSubjectDetail(subjId);
+    showToast('nota quitada');
+  }});
 }
 
 function predictNeededGrade(subjId, target = 5){
@@ -3269,15 +3313,16 @@ function deleteCurrentSubject(){
   const message = total > 0
     ? `eliminar "${sub.name}"? esto desvinculará ${eventsCount} eventos y ${scheduleCount} bloques de horario (no se borran, quedan sin asignatura).`
     : `eliminar "${sub.name}"?`;
-  if(!confirm(message)) return;
-
-  // Remove subject; events/schedule keep their old subj id (will be auto-handled by populateSubjectSelect)
-  STATE.subjects = STATE.subjects.filter(s => s.id !== editingSubjectId);
-  if(selectedSubjId === editingSubjectId) selectedSubjId = null;
-  saveState();
-  closeModalForce('modal-subject');
-  renderAll();
-  showToast('asignatura eliminada');
+  const delId = editingSubjectId;
+  showConfirmModal({title:'eliminar asignatura', message, confirmLabel:'eliminar', onConfirm:()=>{
+    // los eventos/horario conservan su subj id (los reasigna populateSubjectSelect)
+    STATE.subjects = STATE.subjects.filter(s => s.id !== delId);
+    if(selectedSubjId === delId) selectedSubjId = null;
+    saveState();
+    closeModalForce('modal-subject');
+    renderAll();
+    showToast('asignatura eliminada');
+  }});
 }
 
 // ═══════════════════════════════════════════
@@ -5418,6 +5463,54 @@ function deleteNote(){
 function closeModal(e, id){
   if(e.target.id === id) document.getElementById(id).classList.remove('open');
 }
+// ── modales genéricos con la estética de plan (evitan prompt/confirm nativos) ──
+let inputModalOnSave = null;
+function showInputModal(opts){
+  opts = opts || {};
+  inputModalOnSave = opts.onSave || null;
+  document.getElementById('input-modal-title').textContent = opts.title || 'añadir';
+  document.getElementById('input-modal-lbl').textContent = opts.label || '';
+  const ta = document.getElementById('input-modal-text');
+  ta.value = opts.value || '';
+  ta.placeholder = opts.placeholder || '';
+  document.getElementById('input-modal-save').textContent = opts.saveLabel || 'guardar';
+  document.getElementById('modal-input').classList.add('open');
+  setTimeout(() => { try{ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }catch(_){} }, 60);
+}
+function closeInputModal(){
+  document.getElementById('modal-input').classList.remove('open');
+  inputModalOnSave = null;
+}
+function confirmInputModal(){
+  const val = document.getElementById('input-modal-text').value;
+  const cb = inputModalOnSave;
+  document.getElementById('modal-input').classList.remove('open');
+  inputModalOnSave = null;
+  if(cb) cb(val);
+}
+
+let askModalOnConfirm = null;
+function showConfirmModal(opts){
+  opts = opts || {};
+  askModalOnConfirm = opts.onConfirm || null;
+  document.getElementById('ask-modal-title').textContent = opts.title || 'confirmar';
+  document.getElementById('ask-modal-msg').textContent = opts.message || '';
+  const ok = document.getElementById('ask-modal-ok');
+  ok.className = 'modal-btn ' + (opts.danger === false ? 'primary' : 'danger');
+  ok.textContent = opts.confirmLabel || 'eliminar';
+  document.getElementById('modal-ask').classList.add('open');
+}
+function closeAskModal(){
+  document.getElementById('modal-ask').classList.remove('open');
+  askModalOnConfirm = null;
+}
+function confirmAskModal(){
+  const cb = askModalOnConfirm;
+  document.getElementById('modal-ask').classList.remove('open');
+  askModalOnConfirm = null;
+  if(cb) cb();
+}
+
 function closeModalForce(id){
   document.getElementById(id).classList.remove('open');
 }
@@ -6245,11 +6338,12 @@ function initIaWelcome(){
 }
 
 function clearIaChat(){
-  if(!confirm('¿empezar una conversación nueva con la ia? tu plan (asignaturas, eventos, horario) no se toca.')) return;
-  STATE.iaMessages = [];
-  saveState();
-  initIaWelcome();
-  showToast('conversación reiniciada');
+  showConfirmModal({title:'nueva conversación', message:'¿empezar una conversación nueva con la ia? tu plan (asignaturas, eventos, horario) no se toca.', confirmLabel:'empezar', danger:false, onConfirm:()=>{
+    STATE.iaMessages = [];
+    saveState();
+    initIaWelcome();
+    showToast('conversación reiniciada');
+  }});
 }
 
 // ═══════════════════════════════════════════
