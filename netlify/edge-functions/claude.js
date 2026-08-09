@@ -6,21 +6,56 @@
 // respuestas largas en streaming, así que el timeout desaparece.
 //
 // ENDURECIMIENTO (protección de costes):
-// - el MODELO se fija aquí en el servidor: se ignora el que pida el cliente
-// - max_tokens con tope
+// - el MODELO lo decide el SERVIDOR a partir de la INTENCIÓN declarada:
+//   se ignora por completo el modelo que pida el cliente
+// - max_tokens con tope por intención
 // - solo se reenvían a la API los campos de la lista blanca
 // - límites de tamaño en messages y system
 // - header Origin OBLIGATORIO y comprobado contra los dominios permitidos
 //   (los previews *.netlify.app solo se aceptan si son de este mismo sitio)
-// - contador diario agregado de peticiones en netlify blobs (store "metricas-ia")
+// - presupuesto diario por cliente y global en netlify blobs (permisivo, y
+//   SIEMPRE fail-open: si blobs falla, la herramienta sigue funcionando)
+//
+// CACHÉ DE PROMPT:
+// el system puede llegar como array de bloques. El primer bloque es el prompt
+// estático de plan (~3.300 tokens, por encima del mínimo de 2.048 que exige
+// sonnet) y se marca con cache_control efímero: las lecturas de caché se
+// facturan a 0,1x la tarifa de entrada. El contexto volátil del estudiante va
+// en un bloque posterior, para no romper el prefijo cacheable.
 //
 // Despliegue: netlify/edge-functions/claude.js — sirve la ruta /api/claude.
 
-const MODEL = "claude-sonnet-4-6";       // único modelo permitido (el cliente no elige)
-const MAX_TOKENS_CAP = 8000;             // tope de tokens de salida por petición
+// ─── intenciones ────────────────────────────────────────────────────────────
+// el cliente declara PARA QUÉ pide, no CON QUÉ. el servidor traduce.
+// nota: max_tokens es un TECHO, no una reserva: solo se paga lo que se genera.
+// por eso los techos de las intenciones de usuario son generosos (no recortan
+// funcionalidad) y solo existen para frenar una generación desbocada.
+const INTENTS = {
+  // conversación y replanificación: el estudiante espera respuesta completa
+  chat:   { model: "claude-sonnet-4-6", maxTokens: 8000 },
+  // ingesta de pdf/imagen → plan entero: la salida más larga del sistema
+  ingest: { model: "claude-sonnet-4-6", maxTokens: 8000 },
+  // capa 1 — comprobaciones de fondo, invisibles. barata por construcción.
+  check:  { model: "claude-haiku-4-5-20251001", maxTokens: 400 },
+};
+const DEFAULT_INTENT = "chat";
+
 const MAX_MESSAGES = 60;                 // tope de mensajes por conversación enviada
-const MAX_SYSTEM_CHARS = 60000;          // tope del system prompt
+const MAX_SYSTEM_CHARS = 60000;          // tope del system (sumando bloques)
+const MAX_SYSTEM_BLOCKS = 4;
 const MAX_BODY_CHARS = 3000000;          // tope aproximado del cuerpo saliente (~3 MB)
+
+// ─── presupuesto diario (deliberadamente permisivo) ─────────────────────────
+// un estudiante intensivo gasta ~30 peticiones en todo un cuatrimestre.
+// 300/día por cliente son diez veces lo que necesita el uso más pesado que
+// hemos visto, así que nadie legítimo lo va a rozar; solo frena bucles y abuso.
+// el techo global protege la factura: a ~0,03 $ de media por petición,
+// 3.000/día es el peor caso que estamos dispuestos a pagar en un día.
+// subir o bajar aquí es la única palanca que hace falta tocar.
+const MAX_REQUESTS_PER_CLIENT_DAY = 300;
+const MAX_REQUESTS_GLOBAL_DAY = 3000;
+const BUDGET_TIMEOUT_MS = 700;           // pasado esto se deja pasar la petición
+const CLIENT_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
 const ALLOWED_ORIGINS = [
   "https://plan.miradapropia.org",
@@ -51,25 +86,62 @@ function originAllowed(origin, context) {
 function corsFor(origin, context) {
   return {
     "Access-Control-Allow-Origin": originAllowed(origin, context) && origin ? origin : "https://plan.miradapropia.org",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, X-Plan-Client",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
 }
 
-// ─── contador diario de peticiones (netlify blobs) ──────────────────────────
-// dato agregado y anónimo: cuántas peticiones llegan a la ia cada día.
-// import dinámico + try/catch + carrera con timeout: si blobs no está
-// disponible o tarda, el proxy sigue funcionando exactamente igual.
-async function bumpDailyCounter() {
+// clave del día en hora de madrid
+// (regla de la casa: nunca toISOString para días locales)
+function madridDay() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
+}
+
+// ─── presupuesto diario en netlify blobs ────────────────────────────────────
+// dato agregado y anónimo: cuántas peticiones llegan cada día, en total y por
+// cliente. el identificador de cliente lo genera el navegador al azar, no
+// identifica a nadie y no se cruza con ningún otro dato.
+//
+// FAIL-OPEN por diseño: si blobs no está, tarda o falla, la petición PASA.
+// prioridad del proyecto: que la herramienta funcione. un fallo de
+// infraestructura de contadores nunca puede dejar a un estudiante sin ia.
+async function checkBudget(clientId) {
+  const { getStore } = await import("@netlify/blobs");
+  const store = getStore("metricas-ia");
+  const day = madridDay();
+  const globalKey = day;
+  const clientKey = clientId ? `c:${day}:${clientId}` : null;
+
+  const [globalRaw, clientRaw] = await Promise.all([
+    store.get(globalKey),
+    clientKey ? store.get(clientKey) : Promise.resolve(null),
+  ]);
+
+  const globalCount = parseInt(globalRaw || "0", 10) || 0;
+  const clientCount = parseInt(clientRaw || "0", 10) || 0;
+
+  if (globalCount >= MAX_REQUESTS_GLOBAL_DAY) return { blocked: "global" };
+  if (clientKey && clientCount >= MAX_REQUESTS_PER_CLIENT_DAY) return { blocked: "client" };
+
+  await Promise.all([
+    store.set(globalKey, String(globalCount + 1)),
+    clientKey ? store.set(clientKey, String(clientCount + 1)) : Promise.resolve(),
+  ]);
+  return { blocked: null };
+}
+
+// devuelve {blocked} o {blocked:null}. nunca lanza, nunca bloquea por timeout.
+async function budgetGate(clientId) {
   try {
-    const { getStore } = await import("@netlify/blobs");
-    const store = getStore("metricas-ia");
-    // clave del día en hora de madrid (regla de la casa: nunca toISOString para días locales)
-    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
-    const cur = parseInt((await store.get(day)) || "0", 10) || 0;
-    await store.set(day, String(cur + 1));
-  } catch (_) { /* el contador jamás bloquea el proxy */ }
+    const result = await Promise.race([
+      checkBudget(clientId),
+      new Promise((r) => setTimeout(() => r({ blocked: null, timedOut: true }), BUDGET_TIMEOUT_MS)),
+    ]);
+    return result || { blocked: null };
+  } catch (_) {
+    return { blocked: null };
+  }
 }
 
 function jsonError(status, type, message, cors) {
@@ -77,6 +149,40 @@ function jsonError(status, type, message, cors) {
     JSON.stringify({ error: { type, message } }),
     { status, headers: { ...cors, "Content-Type": "application/json" } }
   );
+}
+
+// system: acepta string (compatibilidad) o array de bloques de texto.
+// solo el PRIMER bloque puede marcar caché, y siempre efímera — así el cliente
+// no puede pedir la caché de 1 hora, que se factura al doble en escritura.
+function normalizeSystem(raw) {
+  if (raw === undefined) return { value: undefined };
+
+  if (typeof raw === "string") {
+    if (raw.length > MAX_SYSTEM_CHARS) return { error: "system demasiado largo." };
+    return { value: raw };
+  }
+
+  if (Array.isArray(raw)) {
+    if (raw.length === 0 || raw.length > MAX_SYSTEM_BLOCKS) {
+      return { error: "system: número de bloques inválido." };
+    }
+    let total = 0;
+    const blocks = [];
+    for (let i = 0; i < raw.length; i++) {
+      const b = raw[i];
+      if (!b || typeof b !== "object" || typeof b.text !== "string") {
+        return { error: "system: bloque inválido." };
+      }
+      total += b.text.length;
+      const out = { type: "text", text: b.text };
+      if (i === 0 && b.cache_control) out.cache_control = { type: "ephemeral" };
+      blocks.push(out);
+    }
+    if (total > MAX_SYSTEM_CHARS) return { error: "system demasiado largo." };
+    return { value: blocks };
+  }
+
+  return { error: "system inválido." };
 }
 
 export default async (request, context) => {
@@ -119,29 +225,43 @@ export default async (request, context) => {
   if (body.messages.length > MAX_MESSAGES) {
     return jsonError(400, "invalid_request", "demasiados mensajes en la conversación.", cors);
   }
-  if (body.system !== undefined && (typeof body.system !== "string" || body.system.length > MAX_SYSTEM_CHARS)) {
-    return jsonError(400, "invalid_request", "system inválido o demasiado largo.", cors);
+
+  const sys = normalizeSystem(body.system);
+  if (sys.error) return jsonError(400, "invalid_request", sys.error, cors);
+
+  // INTENCIÓN → modelo y techo de tokens. lo decide el servidor.
+  const intent = INTENTS[body.intent] ? body.intent : DEFAULT_INTENT;
+  const { model, maxTokens } = INTENTS[intent];
+
+  // presupuesto diario (permisivo, fail-open)
+  const rawClientId = request.headers.get("x-plan-client") || "";
+  const clientId = CLIENT_ID_RE.test(rawClientId) ? rawClientId : null;
+  const budget = await budgetGate(clientId);
+  if (budget.blocked === "client") {
+    return jsonError(429, "daily_limit",
+      "has usado la ia muchísimas veces hoy. vuelve mañana y sigue donde lo dejaste: tu plan está intacto y el resto de la herramienta funciona con normalidad.", cors);
+  }
+  if (budget.blocked === "global") {
+    return jsonError(429, "service_limit",
+      "la ia está al límite de uso de hoy. el resto de plan funciona con normalidad; inténtalo mañana.", cors);
   }
 
   // LISTA BLANCA: solo estos campos viajan a la API; modelo y tope de tokens
   // los decide el servidor, se pida lo que se pida desde el cliente.
   const requestedMax = Number(body.max_tokens);
   const outbound = {
-    model: MODEL,
-    max_tokens: Math.min(Number.isFinite(requestedMax) && requestedMax > 0 ? requestedMax : MAX_TOKENS_CAP, MAX_TOKENS_CAP),
+    model,
+    max_tokens: Math.min(Number.isFinite(requestedMax) && requestedMax > 0 ? requestedMax : maxTokens, maxTokens),
     stream: true,
     messages: body.messages,
   };
-  if (typeof body.system === "string") outbound.system = body.system;
+  if (sys.value !== undefined) outbound.system = sys.value;
 
   const outboundStr = JSON.stringify(outbound);
   if (outboundStr.length > MAX_BODY_CHARS) {
     return jsonError(413, "invalid_request",
       "la petición es demasiado grande. si has adjuntado archivos, prueba con una versión más ligera.", cors);
   }
-
-  // contar la petición del día (máx. 400 ms; nunca bloquea la respuesta)
-  await Promise.race([bumpDailyCounter(), new Promise(r => setTimeout(r, 400))]);
 
   let upstream;
   try {
