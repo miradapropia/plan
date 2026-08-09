@@ -198,6 +198,20 @@ Los cambios con `src:'ia'` **tampoco cuentan**: la IA no se avisa a sí misma. U
 
 El prompt le prohíbe repetir lo que capa 0 ya dice y le prohíbe contar hechos que la herramienta ya muestra: solo debe hablar de contradicciones y patrones —esfuerzo que no da fruto, un objetivo que no cuadra con las horas, una decisión que choca con otra—. Ante la duda, `{"aviso": null}`.
 
+### Navegación
+
+Formas de cambiar lo que ves: las cuatro pestañas, profundizar desde el mes (número de semana → semana, día → modal), la ficha de asignatura, la barra de IA y el modo ambiente.
+
+**Historial del navegador.** Cada cambio de vista queda en el historial (`#hoy`, `#week`, `#month`, `#gantt`). El botón atrás es *el* gesto de navegación en móvil y hasta ahora no hacía nada: te sacaba de la herramienta. Al volver, primero se cierra cualquier modal abierto y después se cambia de vista, para que atrás retroceda un paso y no dos. El primer estado se **reemplaza** en vez de empujarse, así el primer atrás sale de plan en lugar de dar vueltas dentro del historial.
+
+**Teclado.** `1`–`4` recorren el eje temporal, `←`/`→` mueven de semana o de mes según la vista abierta, `⌘K`/`Ctrl+K` abre la IA y `Escape` cierra. Todo guardado contra campos de texto (`escribiendo()`) y desactivado con un modal abierto, que es donde este tipo de atajos suele romperse.
+
+### Formas
+
+Escalera concéntrica de radios: **4 · 8 · 12 · 18**. Una auditoría encontró 13 valores distintos en uso (2, 3, 4, 5, 6, 7, 8, 10, 12, 13, 14, 18, 20 px) y 70 de 79 usos fuera de escala. En una interfaz en blanco y negro estricto esto se nota el triple: sin color que distraiga, un radio distinto canta. Al añadir una superficie nueva, usa uno de los cuatro.
+
+Pendiente en `mp.css` v2: congelar `--radius-xs: 4px`, que es el peldaño que la escala del sistema (8/12/18/24) no tenía y que aquí hacía falta para barras, puntos y marcadores pequeños.
+
 ### Propagación — dos disparadores
 
 Todo lo que ocurre en plan entra por uno de dos sitios:
