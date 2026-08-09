@@ -2254,6 +2254,7 @@ const DEFAULT_STATE = () => ({
   iaMessages: [],
   iaCollapsed: false,
   iaChangeLog: [],
+  changeBus: [],   // ver BUS DE CAMBIOS
   theme: 'auto',
   musicEmbed: null,
 });
@@ -2273,10 +2274,59 @@ function getWeekKey(d){
 }
 
 // ═══════════════════════════════════════════
+// BUS DE CAMBIOS
+// ═══════════════════════════════════════════
+// registro preciso de QUE ha cambiado, no solo de que algo ha cambiado.
+// no se pinta en ninguna parte: es infraestructura, no interfaz.
+//
+// para que sirve:
+//   1. la ia puede preguntar "han cambiado estas tres cosas, se rompe algo?"
+//      en vez de reenviar el plan entero. sin esto, cada comprobacion de fondo
+//      costaria lo mismo que una conversacion completa.
+//   2. las comprobaciones deterministas tienen un disparador preciso.
+//   3. la pestana que recibe el evento `storage` puede saber que ha pasado.
+//
+// convencion:
+//   op     add | update | delete | done | log
+//   entity subject | event | schedule | note | session | target | plan
+//   src    user | ia
+const CHANGE_BUS_LIMIT = 60;
+
+function pushChange(change){
+  if(!change || !change.entity) return;
+  if(!Array.isArray(STATE.changeBus)) STATE.changeBus = [];
+  STATE.changeBus.unshift({
+    t: Date.now(),
+    op: String(change.op || 'update').slice(0,12),
+    entity: String(change.entity).slice(0,12),
+    id: (change.id != null && change.id !== '') ? String(change.id).slice(0,64) : null,
+    label: change.label ? String(change.label).slice(0,80) : null,
+    src: change.src === 'ia' ? 'ia' : 'user'
+  });
+  if(STATE.changeBus.length > CHANGE_BUS_LIMIT) STATE.changeBus.length = CHANGE_BUS_LIMIT;
+}
+
+// cambios posteriores a un instante dado, mas recientes primero
+function getChangesSince(ts){
+  if(!Array.isArray(STATE.changeBus)) return [];
+  return STATE.changeBus.filter(c => c.t > (ts || 0));
+}
+
+// delta compacto para enviar a la ia: una linea por cambio, sin ruido.
+function describeChanges(list){
+  return (list || []).map(c =>
+    `${c.op} ${c.entity}${c.id ? ' ' + c.id : ''}${c.label ? ' - ' + c.label : ''}`
+  ).join('\n');
+}
+
+// ═══════════════════════════════════════════
 // PERSISTENCE
 // ═══════════════════════════════════════════
 let saveTimer = null;
-function saveState(){
+// saveState(change) — el argumento es OPCIONAL y solo alimenta el bus.
+// llamarla sin argumento sigue funcionando igual que siempre.
+function saveState(change){
+  if(change) pushChange(change);
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try{
@@ -3006,7 +3056,7 @@ function setSubjectTarget(subjId, value){
   } else {
     sub.targetGrade = Math.min(10, Math.max(0, parseFloat(value)));
   }
-  saveState();
+  saveState({op:'update', entity:'target', id: subjId, label: sub.targetGrade == null ? 'sin objetivo' : String(sub.targetGrade)});
   // Re-render the detail panel to update the prediction
   openSubjectDetail(subjId);
 }
@@ -3297,7 +3347,7 @@ function saveSubject(){
     });
     showToast(`✓ ${name} añadida`);
   }
-  saveState();
+  saveState({op: editingSubjectId ? 'update' : 'add', entity:'subject', label: name});
   closeModalForce('modal-subject');
   renderAll();
 }
@@ -3318,7 +3368,7 @@ function deleteCurrentSubject(){
     // los eventos/horario conservan su subj id (los reasigna populateSubjectSelect)
     STATE.subjects = STATE.subjects.filter(s => s.id !== delId);
     if(selectedSubjId === delId) selectedSubjId = null;
-    saveState();
+    saveState({op:'delete', entity:'subject', id: delId});
     closeModalForce('modal-subject');
     renderAll();
     showToast('asignatura eliminada');
@@ -3900,7 +3950,7 @@ function saveJournal(skip){
   }
   finishSession();
   closeModalForce('modal-journal');
-  saveState();
+  saveState({op:'log', entity:'session'});
   renderAll();
 }
 
@@ -4156,7 +4206,7 @@ function toggleEventDone(idx){
   if(idx < 0) return;
   STATE.events[idx].done = !STATE.events[idx].done;
   updateProgressFromCompletion();
-  saveState();
+  saveState({op:'done', entity:'event', id: STATE.events[idx].subj, label: STATE.events[idx].title});
   renderAll();
 }
 
@@ -4171,7 +4221,7 @@ function toggleStepDone(key){
   if(!STATE.weeklyPlan) return;
   if(!STATE.weeklyPlan.stepDone) STATE.weeklyPlan.stepDone = {};
   STATE.weeklyPlan.stepDone[key] = !STATE.weeklyPlan.stepDone[key];
-  saveState();
+  saveState({op:'done', entity:'plan', id: key});
   renderAll();
 }
 
@@ -5235,7 +5285,7 @@ function saveEvent(){
     toastMsg += ' · filtro de asignatura quitado';
   }
 
-  saveState();
+  saveState({op: editingEventIdx !== null ? 'update' : 'add', entity:'event', id: data.subj, label: data.title});
   closeModalForce('modal-event');
   renderAll();
   showToast(toastMsg);
@@ -5243,8 +5293,9 @@ function saveEvent(){
 
 function deleteCurrentEvent(){
   if(editingEventIdx === null) return;
+  const removedEv = STATE.events[editingEventIdx];
   STATE.events.splice(editingEventIdx, 1);
-  saveState();
+  saveState({op:'delete', entity:'event', id: removedEv && removedEv.subj, label: removedEv && removedEv.title});
   closeModalForce('modal-event');
   renderAll();
   showToast('evento eliminado');
@@ -5405,15 +5456,16 @@ function saveSchedule(){
     showToast('bloque actualizado');
   }
 
-  saveState();
+  saveState({op:'update', entity:'schedule', id: subj});
   closeModalForce('modal-schedule');
   renderAll();
 }
 
 function deleteCurrentSchedule(){
   if(editingScheduleIdx === null) return;
+  const removedSch = STATE.schedule[editingScheduleIdx];
   STATE.schedule.splice(editingScheduleIdx, 1);
-  saveState();
+  saveState({op:'delete', entity:'schedule', id: removedSch && removedSch.subj});
   closeModalForce('modal-schedule');
   renderAll();
   showToast('bloque eliminado');
@@ -5442,7 +5494,7 @@ function saveNote(){
   } else {
     delete STATE.notes[editingNoteKey];
   }
-  saveState();
+  saveState({op: text ? 'update' : 'delete', entity:'note', id: editingNoteKey});
   closeModalForce('modal-note');
   renderAll();
   showToast(text ? 'nota guardada' : 'nota eliminada');
@@ -5450,8 +5502,9 @@ function saveNote(){
 
 function deleteNote(){
   if(!editingNoteKey) return;
+  const removedNoteKey = editingNoteKey;
   delete STATE.notes[editingNoteKey];
-  saveState();
+  saveState({op:'delete', entity:'note', id: removedNoteKey});
   closeModalForce('modal-note');
   renderAll();
   showToast('nota eliminada');
@@ -5681,35 +5734,23 @@ function renderChips(){
 // ═══════════════════════════════════════════
 // IA — system prompt + send
 // ═══════════════════════════════════════════
-function getIaSystemPrompt(){
-  const ctx = {
-    subjects: STATE.subjects.map(s => {
-      const g = computeSubjectGrade(s.id);
-      const hoursLogged = STATE.sessionLogs.filter(l => l.subjId === s.id).reduce((acc,l)=>acc+l.minutes,0)/60;
-      return {
-        id: s.id, name: s.name, weeklyHours: s.weeklyHours, progress: s.progress,
-        // grade context: helps the IA tailor plans based on past performance
-        avg_grade: (g.hasData && g.average !== null) ? Math.round(g.average*100)/100 : null,
-        graded_count: g.hasData ? g.gradedCount : 0,
-        pending_eval: g.hasData ? g.pendingCount : 0,
-        target_grade: (s.targetGrade !== undefined && s.targetGrade !== null) ? s.targetGrade : null,
-        hours_logged: Math.round(hoursLogged*10)/10
-      };
-    }),
-    events_count: STATE.events.length,
-    has_schedule: STATE.schedule.length > 0,
-    has_plan: !!STATE.weeklyPlan,
-    today: fmtDate(new Date()),
-    current_view: document.querySelector('.view.active')?.id.replace('view-','') || 'hoy',
-    selected_subject: selectedSubjId
-  };
-
-  return `eres el asistente de planificación de plan, herramienta para estudiantes de arquitectura de miradapropia.org.
+// ═══════════════════════════════════════════
+// IA — system prompt + send
+// ═══════════════════════════════════════════
+// el prompt viaja en DOS bloques y el orden importa:
+//   1. IA_SYSTEM_STATIC — invariante (~3.300 tokens). es el prefijo cacheable:
+//      las lecturas de cache se facturan a 0,1x la tarifa de entrada, y sonnet
+//      exige un minimo de 2.048 tokens para cachear, que este bloque supera.
+//   2. el contexto del estudiante — cambia en cada peticion, asi que va DETRAS.
+//      si fuera delante (como estaba hasta 2026-08) invalidaria el prefijo en
+//      cada turno y NADA de lo que viene despues llegaria a cachearse nunca.
+// regla: no metas nada volatil (fechas, contadores, estado) en el bloque 1.
+const IA_SYSTEM_STATIC = `eres el asistente de planificación de plan, herramienta para estudiantes de arquitectura de miradapropia.org.
 
 estilo: escribe en minúsculas, tono cercano y directo, sin emojis nunca.
 
-CONTEXTO ACTUAL DEL ESTUDIANTE:
-${JSON.stringify(ctx, null, 2)}
+CONTEXTO DEL ESTUDIANTE:
+al final de estas instrucciones tienes el estado real y completo del plan (asignaturas, medias, notas objetivo, evaluaciones pendientes, horas registradas y qué vista tiene abierta). consúltalo SIEMPRE antes de preguntar nada.
 
 CAPACIDADES:
 1. crear y modificar asignaturas (hasta 10 por cuatrimestre, sin acentos en el id)
@@ -5746,7 +5787,7 @@ SÉ EXHAUSTIVO PERO NO INVENTES: extrae todo lo que esté en el documento, pero 
 DESPUÉS DE EXTRAER, PLANIFICA: una vez volcada la información, genera automáticamente un weekly_plan inicial coherente con las fechas detectadas y las notas objetivo (si las hay), sin esperar a que el estudiante lo pida — ya tiene todo el contexto que necesita.
 
 MEMORIA DE LA CONVERSACIÓN:
-recuerdas TODO lo que ha pasado en esta conversación: los archivos que el estudiante ha subido, lo que extrajiste de ellos, sus respuestas y las asignaturas/eventos/horario que ya has creado (están en el CONTEXTO ACTUAL de arriba). NUNCA vuelvas a pedir un archivo que ya te han subido ni preguntes información que ya tienes en el contexto. si el estudiante dice "añade una sesión más de física", ya sabes qué es física y cuándo tiene cosas; actúa directamente. solo pregunta si falta un dato que de verdad no aparece por ningún lado. (la conversación puede llegar recortada a los últimos mensajes; el CONTEXTO ACTUAL de arriba siempre refleja el estado real y completo del plan.)
+recuerdas TODO lo que ha pasado en esta conversación: los archivos que el estudiante ha subido, lo que extrajiste de ellos, sus respuestas y las asignaturas/eventos/horario que ya has creado (están en el CONTEXTO DEL ESTUDIANTE que va al final). NUNCA vuelvas a pedir un archivo que ya te han subido ni preguntes información que ya tienes en el contexto. si el estudiante dice "añade una sesión más de física", ya sabes qué es física y cuándo tiene cosas; actúa directamente. solo pregunta si falta un dato que de verdad no aparece por ningún lado. (la conversación puede llegar recortada a los últimos mensajes; el CONTEXTO DEL ESTUDIANTE del final siempre refleja el estado real y completo del plan.)
 
 PLANIFICACIÓN BASADA EN RENDIMIENTO Y NOTA OBJETIVO:
 en el contexto tienes, por asignatura: avg_grade (nota media obtenida hasta ahora, escala 0-10), graded_count (cuántas notas tiene), pending_eval (evaluaciones pendientes), target_grade (nota que el estudiante quiere sacar, null si no la ha puesto = objetivo 5 por defecto) y hours_logged (horas de estudio registradas).
@@ -5835,6 +5876,54 @@ CRITERIOS DEL PLAN:
 - las horas de estudio en schedule deben ser realistas (ej. 18-20h, 20-22h en días laborables; 10-12h, 16-18h en fin de semana)
 
 todo en minúsculas, tono cercano, español. respuestas breves y concretas (máximo 4 frases si no hay json).`;
+
+// contexto volatil: lo que la ia necesita saber del plan AHORA MISMO.
+function getIaContext(){
+  return {
+    subjects: STATE.subjects.map(s => {
+      const g = computeSubjectGrade(s.id);
+      const hoursLogged = STATE.sessionLogs.filter(l => l.subjId === s.id).reduce((acc,l)=>acc+l.minutes,0)/60;
+      return {
+        id: s.id, name: s.name, weeklyHours: s.weeklyHours, progress: s.progress,
+        // grade context: helps the IA tailor plans based on past performance
+        avg_grade: (g.hasData && g.average !== null) ? Math.round(g.average*100)/100 : null,
+        graded_count: g.hasData ? g.gradedCount : 0,
+        pending_eval: g.hasData ? g.pendingCount : 0,
+        target_grade: (s.targetGrade !== undefined && s.targetGrade !== null) ? s.targetGrade : null,
+        hours_logged: Math.round(hoursLogged*10)/10
+      };
+    }),
+    events_count: STATE.events.length,
+    has_schedule: STATE.schedule.length > 0,
+    has_plan: !!STATE.weeklyPlan,
+    today: fmtDate(new Date()),
+    current_view: document.querySelector('.view.active')?.id.replace('view-','') || 'hoy',
+    selected_subject: selectedSubjId
+  };
+}
+
+// bloques de system listos para la api. solo el primero pide cache.
+function getIaSystemBlocks(){
+  return [
+    { type:'text', text: IA_SYSTEM_STATIC, cache_control:{type:'ephemeral'} },
+    { type:'text', text: 'CONTEXTO DEL ESTUDIANTE (estado real y completo del plan):\n' +
+                          JSON.stringify(getIaContext(), null, 2) }
+  ];
+}
+
+// identificador anonimo de cliente. existe SOLO para el presupuesto diario de
+// la ia: es aleatorio, no identifica a nadie y no se cruza con ningun otro dato.
+function getClientId(){
+  try{
+    let id = localStorage.getItem('plan_client_id');
+    if(!id || !/^[A-Za-z0-9_-]{8,64}$/.test(id)){
+      id = (self.crypto && self.crypto.randomUUID)
+        ? self.crypto.randomUUID()
+        : 'c' + Math.random().toString(36).slice(2,10) + Math.random().toString(36).slice(2,10);
+      localStorage.setItem('plan_client_id', id);
+    }
+    return id;
+  }catch(e){ return null; }
 }
 
 function autoResize(t){
@@ -5903,16 +5992,35 @@ async function sendMsg(){
     // mensajes (controla el coste por turno y evita errores de contexto a final de curso)
     let apiMessages = STATE.iaMessages.slice(-IA_HISTORY_LIMIT).map(m => ({role: m.role, content: m.content}));
     while(apiMessages.length && apiMessages[0].role !== 'user') apiMessages.shift();
+    // la INTENCION decide modelo y techo en el servidor; el cliente no elige.
+    // 'ingest' = hay archivos que volcar al plan; 'chat' = todo lo demas.
+    const iaIntent = STATE.iaMessages.some(m => m.hadFiles) || hasFiles ? 'ingest' : 'chat';
+    const clientId = getClientId();
     const res = await fetch('/api/claude', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers: Object.assign(
+        {'Content-Type':'application/json'},
+        clientId ? {'X-Plan-Client': clientId} : {}
+      ),
       body: JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens: 8000,
-        system: getIaSystemPrompt(),
+        intent: iaIntent,
+        system: getIaSystemBlocks(),
         messages: apiMessages
       })
     });
+
+    if(res.status === 429){
+      typing.remove();
+      let msg = 'has usado la ia muchas veces hoy. tu plan esta intacto y el resto de plan funciona con normalidad: manana puedes seguir donde lo dejaste.';
+      try{
+        const d = await res.json();
+        if(d && d.error && d.error.message) msg = d.error.message;
+      }catch(e){}
+      addBubble('assistant', msg);
+      STATE.iaMessages.pop();
+      saveState();
+      throw new Error('Rate limited');
+    }
 
     if(res.status === 404){
       typing.remove();
@@ -6910,14 +7018,18 @@ function renderMusic(){
 // ═══════════════════════════════════════════
 // IA CHANGELOG
 // ═══════════════════════════════════════════
-function logChange(action, summary){
+// tercer argumento opcional: la entidad tocada. las llamadas antiguas de dos
+// argumentos siguen valiendo y caen en 'plan'.
+function logChange(action, summary, entity){
   if(!STATE.iaChangeLog) STATE.iaChangeLog = [];
   STATE.iaChangeLog.unshift({
     action, summary,
     time: Date.now()
   });
   if(STATE.iaChangeLog.length > 12) STATE.iaChangeLog.length = 12;
-  saveState();
+  // los cambios de la ia entran en el bus marcados con src:'ia', para poder
+  // distinguir "lo hizo el estudiante" de "lo hice yo" sin ambiguedad.
+  saveState({op: action, entity: entity || 'plan', label: summary, src: 'ia'});
   renderChangelog();
 }
 

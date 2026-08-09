@@ -122,11 +122,37 @@ plan-miradapropia/
 
 ### Cambiar el modelo de IA
 
-El modelo se fija en DOS sitios que deben coincidir: `index.html` (busca `claude-sonnet-4-6`) y `netlify/edge-functions/claude.js` (constante `MODEL`). Por protección de costes, el servidor ignora el modelo que pida el cliente y usa siempre el de la Edge Function. Opciones:
+El modelo **ya no se fija en el cliente**. El cliente declara una *intención* y el servidor decide modelo y techo de tokens. Todo vive en la tabla `INTENTS` de `netlify/edge-functions/claude.js`:
 
-- `claude-sonnet-4-6` — actual (recomendado: equilibrio coste/calidad)
-- `claude-opus-4-7` — más capaz, más caro
-- `claude-haiku-4-5-20251001` — más rápido y barato
+| Intención | Cuándo | Modelo | Techo |
+|-----------|--------|--------|-------|
+| `chat`    | conversación y replanificación | `claude-sonnet-4-6` | 8000 |
+| `ingest`  | volcar un PDF o imagen al plan | `claude-sonnet-4-6` | 8000 |
+| `check`   | comprobaciones de fondo (capa 1) | `claude-haiku-4-5-20251001` | 400 |
+
+Una intención desconocida cae en `chat`. `max_tokens` es un techo, no una reserva: solo se paga lo que se genera, así que los techos de las intenciones de usuario son generosos a propósito y solo existen para frenar una generación desbocada.
+
+### Caché de prompt
+
+El *system* viaja en dos bloques y **el orden importa**:
+
+1. `IA_SYSTEM_STATIC` (`index.html`) — invariante, ~3.350 tokens. Lleva `cache_control` efímero: las lecturas de caché se facturan a 0,1x la tarifa de entrada, y Sonnet exige un mínimo de 2.048 tokens para cachear.
+2. El contexto del estudiante — cambia en cada petición, así que va **detrás**.
+
+Si metes algo volátil (una fecha, un contador, estado del plan) en el bloque 1, el prefijo deja de coincidir y **no se cachea nada**. Es exactamente lo que pasaba hasta agosto de 2026, cuando el contexto iba en medio del prompt.
+
+### Presupuesto diario de la IA
+
+En `netlify/edge-functions/claude.js`, dos constantes:
+
+- `MAX_REQUESTS_PER_CLIENT_DAY` (300) — por navegador. Un estudiante intensivo gasta ~30 en todo un cuatrimestre.
+- `MAX_REQUESTS_GLOBAL_DAY` (3000) — techo de la factura.
+
+Los contadores viven en Netlify Blobs (store `metricas-ia`) y son **fail-open**: si Blobs falla o tarda más de 700 ms, la petición pasa igual. Un fallo de contadores nunca puede dejar a un estudiante sin IA.
+
+### Bus de cambios
+
+`STATE.changeBus` (en `index.html`) registra qué ha cambiado, no solo que algo ha cambiado: `{t, op, entity, id, label, src}`. No se pinta en ninguna parte. Sirve para que la IA pueda recibir un delta compacto en vez del plan entero, y para dar un disparador preciso a las comprobaciones deterministas. Se alimenta pasando un descriptor opcional a `saveState({op, entity, id, label})`; llamarla sin argumento sigue funcionando igual que siempre.
 
 ### Cambiar el system prompt de la IA
 
@@ -185,7 +211,7 @@ Este error viene de **una extensión del navegador** (típicamente un bloqueador
 
 - **HTML/CSS/JS vanilla** — sin frameworks, sin build, sin transpilación
 - **localStorage** — persistencia local (límite ~5–10 MB por dominio)
-- **Netlify Functions** — proxy serverless para ocultar la API key
+- **Netlify Edge Function** (Deno) — proxy con streaming SSE, para esquivar el timeout de 10 s de las Functions normales
 - **Anthropic Claude API** — para el motor de IA
 - **Inter** (Google Fonts) — única dependencia externa de runtime
 
