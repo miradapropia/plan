@@ -249,10 +249,13 @@ export default async (request, context) => {
   // LISTA BLANCA: solo estos campos viajan a la API; modelo y tope de tokens
   // los decide el servidor, se pida lo que se pida desde el cliente.
   const requestedMax = Number(body.max_tokens);
+  // los chequeos de fondo (capa 1) NO van por streaming: nadie los mira
+  // mientras se generan, y en json el cliente se ahorra parsear sse.
+  const wantsStream = intent !== "check";
   const outbound = {
     model,
     max_tokens: Math.min(Number.isFinite(requestedMax) && requestedMax > 0 ? requestedMax : maxTokens, maxTokens),
-    stream: true,
+    stream: wantsStream,
     messages: body.messages,
   };
   if (sys.value !== undefined) outbound.system = sys.value;
@@ -288,12 +291,14 @@ export default async (request, context) => {
     });
   }
 
-  // Devolver el SSE al navegador en streaming
+  // Devolver el SSE al navegador en streaming, o el json tal cual si no lo hay
   return new Response(upstream.body, {
     status: upstream.status,
     headers: {
       ...cors,
-      "Content-Type": "text/event-stream; charset=utf-8",
+      "Content-Type": wantsStream
+        ? "text/event-stream; charset=utf-8"
+        : (upstreamType || "application/json"),
       "Cache-Control": "no-cache",
     },
   });

@@ -1019,6 +1019,8 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
 .aviso.warn .aviso-glyph{color:var(--data-warn)}
 .aviso.urgent .aviso-glyph{color:var(--data-urgent)}
 .aviso-body{flex:1;min-width:0}
+.aviso-fuente{display:inline-block;margin-left:8px;font-size:8px;letter-spacing:2px;
+  text-transform:uppercase;color:var(--g-400);vertical-align:middle}
 .aviso-act{flex-shrink:0;border:1px solid var(--g-200);background:transparent;
   color:var(--ink);font-family:inherit;font-size:10px;letter-spacing:.4px;
   padding:3px 9px;border-radius:6px;cursor:pointer;
@@ -2298,6 +2300,7 @@ const DEFAULT_STATE = () => ({
   iaChangeLog: [],
   changeBus: [],   // ver BUS DE CAMBIOS
   avisosOff: {},   // avisos descartados: {clave: firma}
+  capa1: {at:0, hash:'', dia:'', n:0, aviso:null},  // ver CAPA 1
   theme: 'auto',
   musicEmbed: null,
 });
@@ -2369,7 +2372,12 @@ let saveTimer = null;
 // saveState(change) — el argumento es OPCIONAL y solo alimenta el bus.
 // llamarla sin argumento sigue funcionando igual que siempre.
 function saveState(change){
-  if(change) pushChange(change);
+  if(change){
+    pushChange(change);
+    // solo los cambios del estudiante ponen en marcha al vigilante: los de la
+    // ia no son novedad para ella misma
+    if(change.src !== 'ia' && typeof programarCapa1 === 'function') programarCapa1();
+  }
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try{
@@ -4260,6 +4268,18 @@ function computeAvisos(){
     });
   }
 
+  // ── lo que haya visto el vigilante de fondo (capa 1) ─────────────────
+  // se pinta en la misma tira, pero marcado: el estudiante tiene derecho a
+  // saber que esto es un juicio del asistente y no un hecho de su plan.
+  const c1 = STATE.capa1 && STATE.capa1.aviso;
+  if(c1 && c1.texto){
+    out.push({
+      key:'ia-vigilante', sig:c1.sig || 'x', level:c1.nivel === 'warn' ? 'warn' : 'info',
+      fuente:'asistente', text:c1.texto,
+      act: c1.sugerencia ? {label:'pedirselo', run:() => askIa(c1.sugerencia)} : null
+    });
+  }
+
   // orden: urgente primero, y como mucho AVISOS_MAX en pantalla
   const peso = {urgent:0, warn:1, info:2};
   return out
@@ -4311,10 +4331,200 @@ function renderAvisos(){
   return `<div class="avisos">` + AVISOS_ACTIVOS.map((a, i) => `
     <div class="aviso ${a.level}" style="animation-delay:${i*40}ms">
       <span class="aviso-glyph" aria-hidden="true">${AVISO_GLYPH[a.level]}</span>
-      <span class="aviso-body">${esc(a.text)}</span>
+      <span class="aviso-body">${esc(a.text)}${a.fuente ? `<span class="aviso-fuente">${esc(a.fuente)}</span>` : ''}</span>
       ${a.act ? `<button class="aviso-act" onclick="runAviso(${i})">${esc(a.act.label)}</button>` : ''}
       <button class="aviso-close" onclick="dismissAvisoAt(${i})" aria-label="descartar aviso" title="descartar">\u2715</button>
     </div>`).join('') + `</div>`;
+}
+
+// ═══════════════════════════════════════════
+// CAPA 1 — EL VIGILANTE DE FONDO
+// ═══════════════════════════════════════════
+// una comprobacion en haiku que se dispara sola tras un rato sin tocar nada,
+// mira el DELTA del bus (no el plan entero) y como mucho suelta una frase.
+//
+// esta capa gasta dinero en algo que el estudiante NO ha pedido, asi que las
+// guardas pesan mas que la funcionalidad. no se ejecuta si:
+//   - la barra de la ia esta abierta (ya esta hablando con ella)
+//   - hay un pomodoro corriendo (romper el foco es justo lo contrario del fin
+//     de la herramienta)
+//   - la pestana no esta visible
+//   - hay un aviso URGENTE de capa 0 (ya tiene un problema mas claro delante)
+//   - el delta es pequeno y no hay ningun cambio de peso
+//   - ya se pregunto por este mismo delta
+//   - se agoto el cupo del dia
+//
+// coste por chequeo: ~880 tokens de entrada y ~80 de salida en haiku,
+// unos 0,0013 $. NO usa cache de prompt a proposito: el prompt son ~350
+// tokens y haiku exige 1.024 para cachear; inflarlo hasta el minimo saldria
+// mas caro que no cachear.
+const CAPA1_ESPERA_MS   = 45000;  // silencio tras la ultima edicion
+const CAPA1_MIN_CAMBIOS = 3;      // por debajo, solo dispara un cambio de peso
+const CAPA1_MAX_DIA     = 4;      // techo de seguridad, no una expectativa
+// intervalo minimo entre chequeos: sin esto, una sesion larga de edicion
+// (montar el cuatrimestre entero, por ejemplo) funde el cupo del dia en diez
+// minutos, justo cuando el estudiante esta ocupado y menos caso va a hacer.
+const CAPA1_INTERVALO_MS = 20 * 60 * 1000;
+const CAPA1_TIMEOUT_MS  = 12000;
+// cambios que por si solos justifican mirar: cambian el plan de fondo
+const CAPA1_CAMBIO_FUERTE = new Set(['target', 'subject']);
+
+const CAPA1_SYSTEM = `eres el vigilante de fondo de plan, el organizador academico de miradapropia para estudiantes de arquitectura.
+
+recibes un resumen del curso y los ultimos cambios que ha hecho el estudiante, y decides si hay ALGO que merezca decirle. casi siempre la respuesta es que no.
+
+devuelve SOLO json, sin markdown ni texto alrededor:
+{"aviso": null}
+o
+{"aviso": {"texto": "...", "nivel": "warn", "sugerencia": "..."}}
+
+reglas:
+- texto: UNA frase, en minusculas, sin emojis, maximo 140 caracteres, tuteando.
+- sugerencia: lo que el estudiante le pediria a la ia para arreglarlo, escrito en primera persona suya, maximo 160 caracteres.
+- nivel: "warn" si conviene actuar pronto, "info" si solo es una observacion util.
+- NO repitas nada de la lista "ya_avisado": eso ya lo tiene en pantalla.
+- NO le cuentes hechos que ya ve solo (fechas, medias, cuantas entregas tiene). la herramienta ya se los ensena.
+- habla SOLO si detectas una contradiccion o un patron que el no ve: esfuerzo que no da fruto, un objetivo que no cuadra con las horas que le dedica, una decision reciente que choca con otra, un habito que no va a aguantar el cuatrimestre.
+- ante la duda, {"aviso": null}. molestar sin motivo cuesta mas que callarse.`;
+
+let capa1Timer = null;
+
+function capa1Estado(){
+  if(!STATE.capa1 || typeof STATE.capa1 !== 'object') STATE.capa1 = {at:0, hash:'', dia:'', n:0, aviso:null};
+  const hoy = fmtDate(new Date());
+  if(STATE.capa1.dia !== hoy){ STATE.capa1.dia = hoy; STATE.capa1.n = 0; }
+  return STATE.capa1;
+}
+
+function hashCorto(s){
+  let x = 0;
+  for(let i = 0; i < s.length; i++){ x = ((x << 5) - x + s.charCodeAt(i)) | 0; }
+  return String(x);
+}
+
+// resumen minimo del curso. no viaja el plan entero: solo lo que hace falta
+// para juzgar si algo no cuadra.
+function capa1Digest(){
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  return {
+    hoy: fmtDate(hoy),
+    asignaturas: (STATE.subjects || []).slice(0, 10).map(s => {
+      const g = computeSubjectGrade(s.id);
+      const horas = (STATE.sessionLogs || [])
+        .filter(l => l.subjId === s.id).reduce((a,l) => a + l.minutes, 0) / 60;
+      return {
+        n: s.name,
+        objetivo: getTargetGrade(s.id),
+        media: (g.hasData && g.average != null) ? Math.round(g.average*10)/10 : null,
+        pendientes: g.hasData ? g.pendingCount : 0,
+        h_previstas_semana: s.weeklyHours || 0,
+        h_registradas: Math.round(horas*10)/10
+      };
+    }),
+    proximas: (STATE.events || [])
+      .filter(e => !e.done && parseDate(e.date) >= hoy)
+      .sort((a,b) => parseDate(a.date) - parseDate(b.date))
+      .slice(0, 6)
+      .map(e => ({t: e.title, d: e.date, a: e.subj, tipo: e.type})),
+    sesiones_estudio_semana: (STATE.schedule || []).filter(b => b.type === 'estudio').length,
+    tiene_plan: !!STATE.weeklyPlan
+  };
+}
+
+function programarCapa1(){
+  clearTimeout(capa1Timer);
+  capa1Timer = setTimeout(ejecutarCapa1, CAPA1_ESPERA_MS);
+}
+
+async function ejecutarCapa1(){
+  try{
+    const st = capa1Estado();
+    if(st.n >= CAPA1_MAX_DIA) return;
+    if(st.at && Date.now() - st.at < CAPA1_INTERVALO_MS) return;
+    if(document.hidden) return;
+    if(!navigator.onLine) return;
+    const panel = document.getElementById('ia-cmd');
+    if(panel && panel.classList.contains('open')) return;
+    // pomodoro o cronometro de sesion en marcha: es trabajo en foco, y
+    // romperlo es exactamente lo contrario de para lo que existe plan
+    if(typeof timerRunning !== 'undefined' && timerRunning) return;
+    if(typeof sessionRunning !== 'undefined' && sessionRunning) return;
+
+    // si capa 0 ya tiene algo urgente que decir, no anadimos ruido encima
+    const base = computeAvisos();
+    if(base.some(a => a.level === 'urgent')) return;
+
+    // solo cuentan los cambios del estudiante: los de la ia no son novedad
+    // acotado a 25: con el anillo lleno el delta podria irse a ~670 tokens,
+    // y los cambios mas recientes son los que explican la situacion
+    const delta = getChangesSince(st.at).filter(c => c.src === 'user').slice(0, 25);
+    const fuerte = delta.some(c => CAPA1_CAMBIO_FUERTE.has(c.entity));
+    if(delta.length < CAPA1_MIN_CAMBIOS && !fuerte) return;
+
+    const texto = describeChanges(delta);
+    const hash = hashCorto(texto);
+    if(hash === st.hash) return;   // ya preguntamos por este mismo delta
+
+    const payload = {
+      resumen: capa1Digest(),
+      cambios_recientes: texto,
+      ya_avisado: base.map(a => a.text)
+    };
+
+    const ctrl = new AbortController();
+    const corte = setTimeout(() => ctrl.abort(), CAPA1_TIMEOUT_MS);
+    let res;
+    try{
+      const clientId = getClientId();
+      res = await fetch('/api/claude', {
+        method:'POST',
+        signal: ctrl.signal,
+        headers: Object.assign({'Content-Type':'application/json'},
+          clientId ? {'X-Plan-Client': clientId} : {}),
+        body: JSON.stringify({
+          intent: 'check',
+          system: CAPA1_SYSTEM,
+          messages: [{role:'user', content: JSON.stringify(payload)}]
+        })
+      });
+    } finally { clearTimeout(corte); }
+
+    // 429: sin cupo. se apaga el resto del dia en vez de seguir insistiendo.
+    if(res.status === 429){ st.n = CAPA1_MAX_DIA; saveState(); return; }
+    if(!res.ok) return;
+
+    const d = await res.json();
+    const raw = (d.content || []).map(c => c.text || '').join('').trim();
+    const m = raw.match(/\{[\s\S]*\}/);
+    if(!m) return;
+
+    let parsed;
+    try{ parsed = JSON.parse(m[0]); }catch(e){ return; }
+
+    st.at = Date.now();
+    st.hash = hash;
+    st.n = (st.n || 0) + 1;
+
+    const av = parsed && parsed.aviso;
+    if(av && typeof av.texto === 'string' && av.texto.trim()){
+      st.aviso = {
+        texto: String(av.texto).slice(0, 180),
+        nivel: av.nivel === 'warn' ? 'warn' : 'info',
+        sugerencia: av.sugerencia ? String(av.sugerencia).slice(0, 220) : null,
+        sig: hash
+      };
+    } else {
+      st.aviso = null;   // ha mirado y no habia nada que decir
+    }
+    saveState();
+    renderAll();
+  }catch(e){
+    // silencio absoluto de cara al estudiante: un chequeo de fondo nunca puede
+    // ensenarle un error a nadie. si falla, simplemente no ha pasado nada.
+    // la traza queda en consola porque, sin ella, un fallo aqui es
+    // indistinguible de "no habia nada que decir" y no hay forma de depurarlo.
+    if(e && e.name !== 'AbortError') console.debug('[capa1]', e);
+  }
 }
 
 function renderHoy(){

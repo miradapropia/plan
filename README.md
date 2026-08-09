@@ -166,6 +166,29 @@ Reglas al añadir una comprobación nueva:
 - Cada aviso lleva una `sig` (firma del estado). Si el estudiante lo descarta y luego la situación cambia, la firma cambia y el aviso vuelve.
 - El color solo va en el filo izquierdo y **siempre** acompañado de glifo y texto: nunca es el único canal. El punto de la pestaña va en tinta, porque una pestaña es cromo de interfaz.
 
+### Capa 1 — el vigilante de fondo
+
+Una comprobación en Haiku (`ejecutarCapa1()`) que se dispara sola 45 s después de la última edición, mira el **delta del bus** —no el plan entero— y como mucho suelta una frase, que aparece en la misma tira de avisos marcada como `asistente`.
+
+Coste medido: **~0,001 $ por chequeo** (~500 tokens de entrada, ~100 de salida). Un turno de conversación en Sonnet cuesta 30 veces más. Techo absoluto: 0,48 $ por estudiante y cuatrimestre; uso realista, ~0,05 $.
+
+**No usa caché de prompt a propósito.** El prompt son ~350 tokens y Haiku exige 1.024 para cachear: inflarlo hasta el mínimo saldría más caro que no cachear.
+
+Esta capa gasta dinero en algo que el estudiante **no ha pedido**, así que las guardas pesan más que la funcionalidad. No se ejecuta si:
+
+- la barra de la IA está abierta (ya está hablando con ella)
+- hay un pomodoro o un cronómetro de sesión en marcha — romper el foco es lo contrario de para lo que existe plan
+- la pestaña no está visible, o no hay conexión
+- capa 0 ya tiene un aviso **urgente** (el estudiante ya tiene un problema más claro delante)
+- el delta trae menos de 3 cambios y ninguno es de peso (`target`, `subject`)
+- ya se preguntó por ese mismo delta (hash)
+- han pasado menos de 20 minutos desde el último chequeo
+- se agotó el cupo del día (4)
+
+Los cambios con `src:'ia'` **no cuentan** como delta: la IA no se avisa a sí misma. Un 429 apaga la capa el resto del día en vez de seguir insistiendo. Cualquier fallo es silencioso de cara al estudiante, con traza en `console.debug` para poder depurarlo.
+
+El prompt le prohíbe repetir lo que capa 0 ya dice y le prohíbe contar hechos que la herramienta ya muestra: solo debe hablar de contradicciones y patrones —esfuerzo que no da fruto, un objetivo que no cuadra con las horas, una decisión que choca con otra—. Ante la duda, `{"aviso": null}`.
+
 ### Bus de cambios
 
 `STATE.changeBus` (en `index.html`) registra qué ha cambiado, no solo que algo ha cambiado: `{t, op, entity, id, label, src}`. No se pinta en ninguna parte. Sirve para que la IA pueda recibir un delta compacto en vez del plan entero, y para dar un disparador preciso a las comprobaciones deterministas. Se alimenta pasando un descriptor opcional a `saveState({op, entity, id, label})`; llamarla sin argumento sigue funcionando igual que siempre.
