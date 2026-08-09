@@ -180,12 +180,21 @@ Esta capa gasta dinero en algo que el estudiante **no ha pedido**, así que las 
 - hay un pomodoro o un cronómetro de sesión en marcha — romper el foco es lo contrario de para lo que existe plan
 - la pestaña no está visible, o no hay conexión
 - capa 0 ya tiene un aviso **urgente** (el estudiante ya tiene un problema más claro delante)
-- el delta trae menos de 3 cambios y ninguno es de peso (`target`, `subject`)
+- el delta trae menos de 3 cambios **estructurales** y ninguno es de peso (`target`, `subject`)
 - ya se preguntó por ese mismo delta (hash)
 - han pasado menos de 20 minutos desde el último chequeo
 - se agotó el cupo del día (4)
 
-Los cambios con `src:'ia'` **no cuentan** como delta: la IA no se avisa a sí misma. Un 429 apaga la capa el resto del día en vez de seguir insistiendo. Cualquier fallo es silencioso de cara al estudiante, con traza en `console.debug` para poder depurarlo.
+**No todo cambio despierta al vigilante**, y esa es la diferencia entre gastar y no gastar:
+
+| | | |
+|---|---|---|
+| **estructural** | cambia la forma del plan | mover o crear una entrega, tocar una asignatura, cambiar la nota objetivo, reorganizar el horario |
+| **rutina** | progreso e higiene | marcar hecho, guardar un enlace, escribir una nota, registrar una sesión |
+
+Solo lo estructural pone el temporizador y solo lo estructural cuenta para el umbral. Marcar doce tareas como hechas —lo que hace un estudiante en una tarde buena— no gasta nada. En una semana tipo esto baja de 5 chequeos a 1.
+
+Los cambios con `src:'ia'` **tampoco cuentan**: la IA no se avisa a sí misma. Un 429 apaga la capa el resto del día en vez de seguir insistiendo. Cualquier fallo es silencioso de cara al estudiante, con traza en `console.debug` para poder depurarlo.
 
 El prompt le prohíbe repetir lo que capa 0 ya dice y le prohíbe contar hechos que la herramienta ya muestra: solo debe hablar de contradicciones y patrones —esfuerzo que no da fruto, un objetivo que no cuadra con las horas, una decisión que choca con otra—. Ante la duda, `{"aviso": null}`.
 

@@ -2385,7 +2385,10 @@ function saveState(change){
     pushChange(change);
     // solo los cambios del estudiante ponen en marcha al vigilante: los de la
     // ia no son novedad para ella misma
-    if(change.src !== 'ia' && typeof programarCapa1 === 'function') programarCapa1();
+    // solo los cambios ESTRUCTURALES del estudiante despiertan al vigilante.
+    // marcar hecho, un enlace o una nota no ponen ni el temporizador.
+    if(change.src !== 'ia' && typeof esCambioEstructural === 'function'
+       && esCambioEstructural(change)) programarCapa1();
   }
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
@@ -4409,6 +4412,26 @@ const CAPA1_TIMEOUT_MS  = 12000;
 // cambios que por si solos justifican mirar: cambian el plan de fondo
 const CAPA1_CAMBIO_FUERTE = new Set(['target', 'subject']);
 
+// no todo cambio merece despertar al vigilante, y esta es la diferencia entre
+// gastar y no gastar.
+//
+// ESTRUCTURAL — cambia la FORMA del plan, asi que puede haber algo que decir:
+//   mover o crear una entrega, tocar una asignatura, cambiar la nota objetivo,
+//   reorganizar el horario.
+// RUTINA — progreso e higiene, no cambian nada sobre lo que opinar:
+//   marcar hecho, guardar un enlace, escribir una nota, registrar una sesion.
+//
+// marcar tres tareas como hechas es exactamente lo que hace un estudiante en
+// una tarde buena. antes eso llegaba al umbral y disparaba un chequeo; ahora
+// ni siquiera programa el temporizador.
+const CAPA1_ENTIDAD_ESTRUCTURAL = new Set(['event', 'subject', 'target', 'schedule', 'plan']);
+
+function esCambioEstructural(c){
+  if(!c || !c.entity) return false;
+  if(c.op === 'done') return false;   // marcar hecho es avanzar, no replanificar
+  return CAPA1_ENTIDAD_ESTRUCTURAL.has(c.entity);
+}
+
 const CAPA1_SYSTEM = `eres el vigilante de fondo de plan, el organizador academico de miradapropia para estudiantes de arquitectura.
 
 recibes un resumen del curso y los ultimos cambios que ha hecho el estudiante, y decides si hay ALGO que merezca decirle. casi siempre la respuesta es que no.
@@ -4495,9 +4518,13 @@ async function ejecutarCapa1(){
     if(base.some(a => a.level === 'urgent')) return;
 
     // solo cuentan los cambios del estudiante: los de la ia no son novedad
-    // acotado a 25: con el anillo lleno el delta podria irse a ~670 tokens,
-    // y los cambios mas recientes son los que explican la situacion
-    const delta = getChangesSince(st.at).filter(c => c.src === 'user').slice(0, 25);
+    // solo cuentan los cambios estructurales del estudiante: ni los de la ia
+    // (no se avisa a si misma) ni la rutina (marcar hecho, enlaces, notas).
+    // acotado a 25: con el anillo lleno el delta se iria a ~670 tokens, y son
+    // los cambios recientes los que explican la situacion.
+    const delta = getChangesSince(st.at)
+      .filter(c => c.src === 'user' && esCambioEstructural(c))
+      .slice(0, 25);
     const fuerte = delta.some(c => CAPA1_CAMBIO_FUERTE.has(c.entity));
     if(delta.length < CAPA1_MIN_CAMBIOS && !fuerte) return;
 
