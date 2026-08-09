@@ -2369,9 +2369,18 @@ function describeChanges(list){
 // PERSISTENCE
 // ═══════════════════════════════════════════
 let saveTimer = null;
+// estado de propagar() — declarado aqui a proposito: saveState() lo usa y se
+// declara ~1.700 lineas antes que la funcion, asi que si las variables
+// vivieran alli quedarian en zona muerta temporal para cualquier llamada
+// temprana. la funcion esta hoisted; estas no.
+let renderPendiente = false;
+let ultimoRenderAt = 0;
 // saveState(change) — el argumento es OPCIONAL y solo alimenta el bus.
 // llamarla sin argumento sigue funcionando igual que siempre.
 function saveState(change){
+  // cualquier guardado propaga a TODA la interfaz. una rafaga de veinte
+  // cambios (una importacion de la ia) repinta una vez, no veinte.
+  propagar();
   if(change){
     pushChange(change);
     // solo los cambios del estudiante ponen en marcha al vigilante: los de la
@@ -3125,7 +3134,7 @@ function addSubjectLink(subjId){
   else if(!/^https?:\/\//i.test(trimmed) && /^[a-z]+:\/\//i.test(trimmed)) type = 'app';
   if(!sub.links) sub.links = [];
   sub.links.push({type, url: trimmed});
-  saveState();
+  saveState({op:'add', entity:'link', id:subjId});
   openSubjectDetail(subjId);
   showToast('enlace añadido');
   }});
@@ -3135,7 +3144,7 @@ function removeSubjectLink(subjId, idx){
   const sub = getSub(subjId);
   if(!sub || !sub.links) return;
   sub.links.splice(idx, 1);
-  saveState();
+  saveState({op:'delete', entity:'link', id:subjId});
   openSubjectDetail(subjId);
   showToast('enlace quitado');
 }
@@ -3148,7 +3157,7 @@ function addSubjectNote(subjId){
     if(!text || !text.trim()) return;
     if(!sub.notes) sub.notes = [];
     sub.notes.push({text: text.trim(), date: new Date().toISOString()});
-    saveState();
+    saveState({op:'add', entity:'note', id:subjId});
     openSubjectDetail(subjId);
     showToast('nota añadida');
   }});
@@ -3158,7 +3167,7 @@ function removeSubjectNote(subjId, idx){
   const sub = getSub(subjId);
   if(!sub || !sub.notes) return;
   sub.notes.splice(idx, 1);
-  saveState();
+  saveState({op:'delete', entity:'note', id:subjId});
   renderAll();
   openSubjectDetail(subjId);
   showToast('nota quitada');
@@ -4079,7 +4088,38 @@ function renderActiveView(){
   if(id === 'gantt') renderGantt();
 }
 
+// ═══════════════════════════════════════════
+// PROPAGACIÓN
+// ═══════════════════════════════════════════
+// dos disparadores generales, y todo lo demas cuelga de ellos:
+//   1. el estudiante cambia algo  -> saveState() -> propagar()
+//   2. el estudiante habla con la ia -> sendMsg() -> propagar()
+//
+// por que centralizarlo: hasta ahora saveState() no repintaba, asi que cada
+// sitio decidia por su cuenta si llamaba a renderAll. cinco no lo hacian
+// (cambiar la nota objetivo, anadir o quitar enlaces y notas de la ficha,
+// arrastrar un evento en la semana) y repintaban solo un trozo. resultado:
+// cambiabas tu nota objetivo y los avisos, la barra lateral y el resto de
+// vistas seguian mostrando lo de antes. quien muta NO deberia tener que
+// acordarse de repintar: esa decision es justo la que desincroniza.
+//
+// las llamadas explicitas a renderAll() siguen donde estaban, porque dan
+// respuesta inmediata; propagar() es la red debajo, no su sustituto.
+function propagar(){
+  if(renderPendiente) return;
+  renderPendiente = true;
+  const alFrame = (typeof requestAnimationFrame === 'function')
+    ? requestAnimationFrame : (f => setTimeout(f, 16));
+  alFrame(() => {
+    renderPendiente = false;
+    // si alguien ya repinto en este mismo frame, no repetimos el trabajo
+    if(Date.now() - ultimoRenderAt < 24) return;
+    renderAll();
+  });
+}
+
 function renderAll(){
+  ultimoRenderAt = Date.now();
   renderSidebar();
   renderDeadline();
   startCountdown();
@@ -4700,7 +4740,7 @@ function toggleEventDone(idx){
 function toggleScheduleDone(idx){
   if(idx < 0) return;
   STATE.schedule[idx].done = !STATE.schedule[idx].done;
-  saveState();
+  saveState({op:'done', entity:'schedule', id:STATE.schedule[idx].subj});
   renderAll();
 }
 
@@ -4971,7 +5011,7 @@ function onDragPointerDown(e){
           b.day = col.index;
           b.startH = newStart;
           b.endH = newStart + dur;
-          saveState();
+          saveState({op:'update', entity:'schedule', id:b.subj, label:'movido a ' + DLBLS[col.index]});
           showToast(`${b.title} → ${DLBLS[col.index]} ${newStart}:00`);
         }
       } else if(type === 'event'){
@@ -4981,7 +5021,7 @@ function onDragPointerDown(e){
           const dates = getWeekDates(weekOffset);
           const newDate = fmtDate(dates[col.index]);
           event.date = newDate;
-          saveState();
+          saveState({op:'update', entity:'event', id:event.subj, label:'movido a ' + newDate});
           const d = dates[col.index];
           showToast(`${event.title} → ${DLBLS[col.index]} ${d.getDate()}/${d.getMonth()+1}`);
         }
@@ -5036,7 +5076,7 @@ function onResizePointerDown(e){
     blockEl.classList.remove('resizing');
     window._suppressClick = true; // prevent the edit modal from opening after resize
     if(b.startH !== origStart || b.endH !== origEnd){
-      saveState();
+      saveState({op:'update', entity:'schedule', id:b.subj, label:'duracion cambiada'});
       showToast(`${b.title} · ${b.endH - b.startH}h`);
     }
     renderAll();
@@ -5808,7 +5848,7 @@ function duplicateCurrentEvent(){
   pendingLinks = [...(copy.links || [])];
   document.getElementById('event-modal-title').textContent = 'editar evento (duplicado)';
   document.getElementById('ev-date').value = newDate;
-  saveState();
+  saveState({op:'add', entity:'event', id:copy.subj, label:copy.title});
   renderAll();
   showToast('duplicado · ajusta la fecha si necesitas');
 }
@@ -6422,7 +6462,13 @@ function iaKey(e){
   if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
 }
 
+// el estudiante entra a hablar con la ia: cualquier chequeo de fondo pendiente
+// sobra. iba a mirar por su cuenta justo lo que ella misma esta a punto de
+// mirar mejor y con mas contexto.
+function cancelarCapa1(){ clearTimeout(capa1Timer); }
+
 async function sendMsg(){
+  cancelarCapa1();
   const inp = document.getElementById('ia-input');
   const txt = inp.value.trim();
   const hasFiles = pendingFiles.length > 0;

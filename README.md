@@ -189,6 +189,23 @@ Los cambios con `src:'ia'` **no cuentan** como delta: la IA no se avisa a sí mi
 
 El prompt le prohíbe repetir lo que capa 0 ya dice y le prohíbe contar hechos que la herramienta ya muestra: solo debe hablar de contradicciones y patrones —esfuerzo que no da fruto, un objetivo que no cuadra con las horas, una decisión que choca con otra—. Ante la duda, `{"aviso": null}`.
 
+### Propagación — dos disparadores
+
+Todo lo que ocurre en plan entra por uno de dos sitios:
+
+1. **el estudiante cambia algo** (una nota, un horario, un enlace, arrastrar una entrega…) → `saveState(change)`
+2. **el estudiante habla con la IA** → `sendMsg()`
+
+Ambos llaman a `propagar()`, que repinta **toda** la interfaz en el siguiente frame: vistas, barra lateral, cuenta atrás, avisos y el punto de la pestaña.
+
+**Por qué está centralizado.** Antes `saveState()` no repintaba, así que cada sitio decidía por su cuenta si llamaba a `renderAll()`. Cinco no lo hacían —cambiar la nota objetivo, añadir o quitar enlaces y notas de la ficha, arrastrar un evento o un bloque en la vista semana— y repintaban solo un trozo. Cambiabas tu nota objetivo y los avisos, la barra lateral y el resto de vistas seguían mostrando lo de antes. **Quien muta no debería tener que acordarse de repintar**: esa decisión es justo la que desincroniza.
+
+`propagar()` coalesce por `requestAnimationFrame`: una ráfaga de veinte cambios (una importación de la IA) repinta **una** vez, no veinte. Y si algún sitio ya repintó en ese mismo frame, no repite el trabajo. Las llamadas explícitas a `renderAll()` siguen donde estaban porque dan respuesta inmediata; `propagar()` es la red debajo, no su sustituto.
+
+Entrar al chat cancela cualquier chequeo de fondo pendiente: iba a mirar por su cuenta justo lo que la IA está a punto de mirar mejor y con más contexto.
+
+**Al añadir una mutación nueva**: pásale un descriptor a `saveState({op, entity, id, label})`. El repintado ya está cubierto; lo que hay que declarar es *qué* cambió, para que llegue al bus y la capa 1 pueda verlo.
+
 ### Bus de cambios
 
 `STATE.changeBus` (en `index.html`) registra qué ha cambiado, no solo que algo ha cambiado: `{t, op, entity, id, label, src}`. No se pinta en ninguna parte. Sirve para que la IA pueda recibir un delta compacto en vez del plan entero, y para dar un disparador preciso a las comprobaciones deterministas. Se alimenta pasando un descriptor opcional a `saveState({op, entity, id, label})`; llamarla sin argumento sigue funcionando igual que siempre.
