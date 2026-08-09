@@ -150,6 +150,22 @@ En `netlify/edge-functions/claude.js`, dos constantes:
 
 Los contadores viven en Netlify Blobs (store `metricas-ia`) y son **fail-open**: si Blobs falla o tarda más de 700 ms, la petición pasa igual. Un fallo de contadores nunca puede dejar a un estudiante sin IA.
 
+### Capa 0 — avisos deterministas
+
+Todo lo que se puede saber **sin preguntarle a un modelo** se calcula en `computeAvisos()` (`index.html`): coste cero, latencia cero, y se recalcula entero en cada `renderAll()`, así que cualquier cambio —del estudiante o de la IA— se refleja al instante.
+
+Comprobaciones actuales: entregas vencidas sin marcar, objetivo de nota fuera de alcance o ya asegurado, semana sobrecargada (esta y la siguiente), entrega cercana sin sesiones de estudio, plan de trabajo desfasado (lo detecta el bus de cambios), ausencia de plan, pesos de evaluación que no suman 100%, referencias a asignaturas borradas y semanas sin ningún día de descanso.
+
+Se muestran como máximo tres, urgentes primero, en la vista *hoy*, más un punto en tinta sobre la pestaña cuando estás en otra vista. Cada aviso puede llevar una acción: navegar, o **redactarle la pregunta a la IA sin enviarla** — el estudiante decide si gasta la llamada.
+
+Reglas al añadir una comprobación nueva:
+
+- **Ningún token se gasta en algo que una función puede decidir.** Antes de subir algo a la IA, intenta bajarlo aquí.
+- Las acciones son **funciones**, nunca cadenas de código en un `onclick`: los avisos incluyen nombres de asignatura y títulos de entrega, y eso dentro de un atributo es una vía de inyección. El registro `AVISOS_ACTIVOS` hace que los handlers solo lleven un índice.
+- **Cuidado con predecir sobre datos incompletos.** Si los pesos de evaluación no suman ~100%, cualquier predicción de nota sale disparatada (con un 35% cargado, para un 5 «haría falta» un 14,3). Ahí no falta nota, falta información: el aviso correcto es el de pesos, no un falso «objetivo imposible».
+- Cada aviso lleva una `sig` (firma del estado). Si el estudiante lo descarta y luego la situación cambia, la firma cambia y el aviso vuelve.
+- El color solo va en el filo izquierdo y **siempre** acompañado de glifo y texto: nunca es el único canal. El punto de la pestaña va en tinta, porque una pestaña es cromo de interfaz.
+
 ### Bus de cambios
 
 `STATE.changeBus` (en `index.html`) registra qué ha cambiado, no solo que algo ha cambiado: `{t, op, entity, id, label, src}`. No se pinta en ninguna parte. Sirve para que la IA pueda recibir un delta compacto en vez del plan entero, y para dar un disparador preciso a las comprobaciones deterministas. Se alimenta pasando un descriptor opcional a `saveState({op, entity, id, label})`; llamarla sin argumento sigue funcionando igual que siempre.

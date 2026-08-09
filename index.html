@@ -409,7 +409,14 @@ nav.tabs{border-bottom:1px solid var(--g200);display:flex;background:var(--white
 .tab{padding:7px 14px;font-size:9px;letter-spacing:1.5px;
   color:var(--g400);cursor:pointer;border:none;background:none;
   border-radius:6px 6px 0 0;margin-bottom:-1px;white-space:nowrap;
+  position:relative;
   transition:color .15s,background .15s;font-family:'Inter',sans-serif}
+/* punto de avisos pendientes. en TINTA, nunca en color: una pestana es cromo
+   de interfaz, y el color solo puede existir como dato (42-sistema-diseno) */
+.tab.has-avisos::after{content:'';position:absolute;top:5px;right:5px;
+  width:4px;height:4px;border-radius:50%;background:var(--ink);
+  animation:avisoIn var(--dur-short) var(--ease-out) both}
+.tab.active.has-avisos::after{display:none}
 .tab:hover{color:var(--black);background:var(--g100)}
 .tab.active{color:var(--black);background:var(--g100);box-shadow:inset 0 -2px 0 var(--black)}
 .main-view{flex:1;overflow-y:auto;padding:0 0 80px 0;position:relative}
@@ -996,6 +1003,41 @@ html.dark .conflict-banner.high{background:rgba(232,90,90,.12)}
 
 .cal-week-num.warn{background:rgba(214,138,58,.2);color:var(--warn);font-weight:600}
 .cal-week-num.high{background:rgba(196,56,56,.2);color:var(--urgent);font-weight:600}
+
+/* ── AVISOS (capa 0 · deterministas) ── */
+/* el color va SOLO en el filo izquierdo y siempre acompanado de glifo y
+   texto: nunca es el unico canal (politica de color funcional, 42-sistema) */
+.avisos{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.aviso{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;
+  border:1px solid var(--g-100);border-left:2px solid var(--g-400);
+  border-radius:var(--r);background:var(--paper-pure);
+  font-size:12px;line-height:1.55;color:var(--g800);
+  animation:avisoIn var(--dur-med) var(--ease-out) both}
+.aviso.warn{border-left-color:var(--data-warn)}
+.aviso.urgent{border-left-color:var(--data-urgent)}
+.aviso-glyph{font-size:8px;line-height:1.9;color:var(--g-400);flex-shrink:0}
+.aviso.warn .aviso-glyph{color:var(--data-warn)}
+.aviso.urgent .aviso-glyph{color:var(--data-urgent)}
+.aviso-body{flex:1;min-width:0}
+.aviso-act{flex-shrink:0;border:1px solid var(--g-200);background:transparent;
+  color:var(--ink);font-family:inherit;font-size:10px;letter-spacing:.4px;
+  padding:3px 9px;border-radius:6px;cursor:pointer;
+  transition:background var(--dur-fast) var(--ease),
+             border-color var(--dur-fast) var(--ease),
+             transform var(--dur-fast) var(--ease)}
+.aviso-act:hover{background:var(--g-50);border-color:var(--g-400)}
+.aviso-act:active{transform:scale(.96)}
+.aviso-close{flex-shrink:0;border:none;background:transparent;color:var(--g-400);
+  font-size:11px;line-height:1;padding:3px;cursor:pointer;
+  transition:color var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
+.aviso-close:hover{color:var(--ink)}
+.aviso-close:active{transform:scale(.9)}
+@keyframes avisoIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(max-width:560px){
+  .aviso{flex-wrap:wrap}
+  .aviso-body{flex:1 1 100%;order:2}
+  .aviso-act{order:3;margin-left:18px}
+}
 
 /* ── WORKLOAD CHART (hoy view) ── */
 .workload-chart{margin-top:8px}
@@ -2255,6 +2297,7 @@ const DEFAULT_STATE = () => ({
   iaCollapsed: false,
   iaChangeLog: [],
   changeBus: [],   // ver BUS DE CAMBIOS
+  avisosOff: {},   // avisos descartados: {clave: firma}
   theme: 'auto',
   musicEmbed: null,
 });
@@ -4035,11 +4078,245 @@ function renderAll(){
   renderSessionLog();
   renderTrackedList();
   renderActiveView();
+  renderAvisoDot();
+}
+
+// renderActiveView solo pinta la vista abierta, asi que desde semana, mes o
+// cuatrimestre no se ven los avisos. este punto los delata sin ruido.
+function renderAvisoDot(){
+  const tab = document.querySelector('.tabs .tab[onclick*="\'hoy\'"]');
+  if(!tab) return;
+  let n = 0;
+  try{ n = computeAvisos().length; }catch(e){}
+  tab.classList.toggle('has-avisos', n > 0);
 }
 
 // ═══════════════════════════════════════════
 // HOY VIEW
 // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+// CAPA 0 — AVISOS DETERMINISTAS
+// ═══════════════════════════════════════════
+// todo lo que se puede saber SIN preguntarle a un modelo, se sabe aqui.
+// coste cero, latencia cero, y se recalcula entero en cada renderAll(): asi
+// cualquier cambio -- del estudiante o de la ia -- se refleja al instante.
+//
+// regla del proyecto: ningun token se gasta en algo que una funcion puede
+// decidir. antes de subir una comprobacion a la ia, intenta bajarla aqui.
+//
+// cada aviso lleva:
+//   key   estable, para poder descartarlo
+//   sig   firma del estado; si cambia, el aviso descartado reaparece
+//   level urgent | warn | info  (siempre redundante con glifo y texto)
+//   act   accion opcional: navegar, o pasarle el problema a la ia YA escrito
+const AVISOS_MAX = 3;
+
+// un decimal con coma: es el separador que toca en castellano
+function num1(n){ return n.toFixed(1).replace('.', ','); }
+
+function fmtDia(dateStr){
+  const d = parseDate(dateStr);
+  return `${d.getDate()} de ${MONTHS_ES[d.getMonth()]}`;
+}
+
+function computeAvisos(){
+  const out = [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const subs = STATE.subjects || [];
+  const evs  = STATE.events || [];
+  const sch  = STATE.schedule || [];
+  const evaluables = e => e.type === 'entrega' || e.type === 'examen';
+
+  // ── vencidas sin marcar ──────────────────────────────────────────────
+  const overdue = evs.filter(e => !e.done && evaluables(e) && parseDate(e.date) < today);
+  if(overdue.length){
+    const first = overdue[overdue.length - 1];
+    out.push({
+      key:'atrasadas', sig:'n'+overdue.length, level:'urgent',
+      text: overdue.length === 1
+        ? `"${first.title}" era del ${fmtDia(first.date)} y sigue sin marcar`
+        : `${overdue.length} entregas o examenes ya pasados siguen sin marcar`,
+      act: {label:'ver', run:() => goToDay(first.date)}
+    });
+  }
+
+  // ── objetivo fuera de alcance ────────────────────────────────────────
+  subs.forEach(s => {
+    // guarda importante: si los pesos declarados no suman ~100%, la prediccion
+    // sale disparatada (con solo un 35% cargado, para un 5 "haria falta" un
+    // 14,3). ahi no falta nota, falta informacion: el aviso correcto es el de
+    // pesos incompletos, mas abajo, no un falso "objetivo imposible".
+    const g = computeSubjectGrade(s.id);
+    if(!g || !g.hasWeights || Math.abs(g.totalWeightSum - 100) > 1) return;
+    const pred = predictNeededGrade(s.id, getTargetGrade(s.id));
+    if(!pred) return;
+    if(!pred.achievable){
+      out.push({
+        key:'imposible-'+s.id, sig:String(Math.round(pred.neededAvg*10)), level:'urgent',
+        text: `en ${s.name} tu objetivo de ${pred.target} ya no sale: necesitarias un ${num1(pred.neededAvg)} en el ${Math.round(pred.remainingWeight)}% que queda`,
+        act: {label:'replantear', run:() => askIa(`en ${s.name} mi objetivo de ${pred.target} ya no es alcanzable. dime que objetivo realista me pongo y reorganiza mis sesiones en consecuencia`)}
+      });
+    } else if(pred.alreadySecured){
+      out.push({
+        key:'asegurado-'+s.id, sig:'ok', level:'info',
+        text: `en ${s.name} ya tienes el ${pred.target} asegurado pase lo que pase: puedes bajarle carga`,
+        act: {label:'reasignar', run:() => askIa(`en ${s.name} ya tengo el objetivo asegurado. baja su carga al minimo y reparte esas horas entre las asignaturas donde mas falta me hacen`)}
+      });
+    } else if(pred.neededAvg >= 8){
+      out.push({
+        key:'exigente-'+s.id, sig:String(Math.round(pred.neededAvg*10)), level:'warn',
+        text: `en ${s.name} necesitas un ${num1(pred.neededAvg)} de media en lo que queda para llegar a tu ${pred.target}`,
+        act: {label:'reforzar', run:() => askIa(`necesito subir en ${s.name}: enfoca sus sesiones a ejercicios tipo examen y sube su prioridad`)}
+      });
+    }
+  });
+
+  // ── semana sobrecargada ──────────────────────────────────────────────
+  const thisWeek = getWeekConflicts(today);
+  const nextMonday = parseDate(today); nextMonday.setDate(today.getDate() + 7);
+  const nextWeek = getWeekConflicts(nextMonday);
+  if(thisWeek.level === 'high'){
+    out.push({
+      key:'semana-cargada', sig:'n'+thisWeek.count, level:'warn',
+      text: `esta semana se te juntan ${thisWeek.count} entregas o examenes`,
+      act: {label:'ver semana', run:() => goToView('week')}
+    });
+  } else if(nextWeek.level === 'high'){
+    out.push({
+      key:'semana-siguiente', sig:'n'+nextWeek.count, level:'warn',
+      text: `la semana que viene se te juntan ${nextWeek.count} entregas o examenes: conviene adelantar trabajo`,
+      act: {label:'repartir', run:() => askIa('la semana que viene se me juntan varias entregas. adelanta trabajo a esta semana y reparte las sesiones para que no se acumule todo')}
+    });
+  }
+
+  // ── entrega cercana sin horas de estudio ─────────────────────────────
+  const in7 = parseDate(today); in7.setDate(today.getDate() + 7);
+  const soon = evs.filter(e => !e.done && evaluables(e) &&
+    parseDate(e.date) >= today && parseDate(e.date) <= in7);
+  const sinEstudio = soon.filter(e => !sch.some(b => b.subj === e.subj && b.type === 'estudio'));
+  if(sinEstudio.length){
+    const e = sinEstudio[0];
+    const sub = getSub(e.subj);
+    out.push({
+      key:'sin-sesiones-'+e.subj, sig:e.date, level:'warn',
+      text: `"${e.title}" es el ${fmtDia(e.date)} y no tienes ninguna sesion de estudio de ${sub ? sub.name : 'esa asignatura'} en el horario`,
+      act: {label:'planificar', run:() => askIa(`tengo "${e.title}" el ${e.date} y no tengo sesiones de estudio planificadas. montame las sesiones necesarias hasta esa fecha`)}
+    });
+  }
+
+  // ── el plan se ha quedado viejo (lo detecta el bus de cambios) ───────
+  if(STATE.weeklyPlan && STATE.weeklyPlan.generatedAt){
+    const desde = getChangesSince(STATE.weeklyPlan.generatedAt)
+      .filter(c => c.src === 'user' && (c.entity === 'event' || c.entity === 'subject' || c.entity === 'target'));
+    if(desde.length >= 3){
+      out.push({
+        key:'plan-viejo', sig:'n'+desde.length, level:'warn',
+        text: `has hecho ${desde.length} cambios desde que se genero tu plan de trabajo: puede que ya no cuadre`,
+        act: {label:'actualizar', run:() => askIa('he cambiado varias cosas desde que hiciste el plan. revisalo y actualizalo con lo que hay ahora')}
+      });
+    }
+  } else if(!STATE.weeklyPlan && subs.length && evs.length >= 2){
+    out.push({
+      key:'sin-plan', sig:'n'+evs.length, level:'info',
+      text: `tienes ${subs.length} asignaturas y ${evs.length} fechas cargadas, pero ningun plan de trabajo`,
+      act: {label:'crear plan', run:() => askIa('organiza mi plan de trabajo con las asignaturas y fechas que ya tengo cargadas')}
+    });
+  }
+
+  // ── pesos de evaluacion incompletos ──────────────────────────────────
+  subs.forEach(s => {
+    const conPeso = evs.filter(e => e.subj === s.id && evaluables(e) &&
+      e.weight != null && !isNaN(e.weight) && e.weight > 0);
+    if(!conPeso.length) return;
+    const suma = conPeso.reduce((a,e) => a + Number(e.weight), 0);
+    if(Math.abs(suma - 100) > 1){
+      out.push({
+        key:'pesos-'+s.id, sig:String(Math.round(suma)), level:'warn',
+        text: `los pesos de evaluacion de ${s.name} suman ${Math.round(suma)}%, no 100%: hasta completarlos no puedo calcularte la media ni lo que necesitas`,
+        act: {label:'completar', run:() => openSubjectDetail(s.id)}
+      });
+    }
+  });
+
+  // ── referencias huerfanas ────────────────────────────────────────────
+  const ids = new Set(subs.map(s => s.id));
+  const huerfanos = evs.filter(e => e.subj && !ids.has(e.subj)).length +
+                    sch.filter(b => b.subj && !ids.has(b.subj)).length;
+  if(huerfanos){
+    out.push({
+      key:'huerfanos', sig:'n'+huerfanos, level:'info',
+      text: `${huerfanos} ${huerfanos === 1 ? 'elemento apunta' : 'elementos apuntan'} a una asignatura que ya no existe`,
+      act: null
+    });
+  }
+
+  // ── ni un dia de descanso ────────────────────────────────────────────
+  const diasConEstudio = new Set(sch.filter(b => b.type === 'estudio').map(b => b.day));
+  if(diasConEstudio.size === 7){
+    out.push({
+      key:'sin-descanso', sig:'7', level:'info',
+      text: 'tienes estudio los siete dias de la semana: sin descanso el plan no aguanta el cuatrimestre',
+      act: {label:'liberar un dia', run:() => askIa('tengo sesiones de estudio los siete dias. libera un dia entero de descanso y reparte esas horas en el resto')}
+    });
+  }
+
+  // orden: urgente primero, y como mucho AVISOS_MAX en pantalla
+  const peso = {urgent:0, warn:1, info:2};
+  return out
+    .filter(a => STATE.avisosOff[a.key] !== a.sig)
+    .sort((a,b) => peso[a.level] - peso[b.level])
+    .slice(0, AVISOS_MAX);
+}
+
+// pasa el problema a la ia YA redactado, pero NO lo envia: el estudiante
+// decide si gasta la llamada. asi la capa 0 no cuesta nada y la ia solo
+// entra cuando el estudiante ve que aporta.
+function askIa(text){
+  openIaCmd();
+  const inp = document.getElementById('ia-input');
+  if(inp){ inp.value = text; autoResize(inp); inp.focus(); }
+}
+
+function dismissAviso(key, sig){
+  if(!STATE.avisosOff || typeof STATE.avisosOff !== 'object') STATE.avisosOff = {};
+  STATE.avisosOff[key] = sig;
+  saveState();
+  renderAll();
+}
+
+const AVISO_GLYPH = {urgent:'\u25CF', warn:'\u25D0', info:'\u25CB'};
+
+// registro de los avisos en pantalla. los handlers solo llevan un indice:
+// ni un solo dato del estudiante acaba dentro de un atributo onclick.
+let AVISOS_ACTIVOS = [];
+
+function runAviso(i){
+  const a = AVISOS_ACTIVOS[i];
+  if(a && a.act && typeof a.act.run === 'function') a.act.run();
+}
+
+function dismissAvisoAt(i){
+  const a = AVISOS_ACTIVOS[i];
+  if(a) dismissAviso(a.key, a.sig);
+}
+
+function goToView(view){
+  const btn = document.querySelector(`.tabs .tab[onclick*="'${view}'"]`);
+  if(btn) switchView(view, btn);
+}
+
+function renderAvisos(){
+  AVISOS_ACTIVOS = computeAvisos();
+  if(!AVISOS_ACTIVOS.length) return '';
+  return `<div class="avisos">` + AVISOS_ACTIVOS.map((a, i) => `
+    <div class="aviso ${a.level}" style="animation-delay:${i*40}ms">
+      <span class="aviso-glyph" aria-hidden="true">${AVISO_GLYPH[a.level]}</span>
+      <span class="aviso-body">${esc(a.text)}</span>
+      ${a.act ? `<button class="aviso-act" onclick="runAviso(${i})">${esc(a.act.label)}</button>` : ''}
+      <button class="aviso-close" onclick="dismissAvisoAt(${i})" aria-label="descartar aviso" title="descartar">\u2715</button>
+    </div>`).join('') + `</div>`;
+}
+
 function renderHoy(){
   const now = new Date();
   const today = new Date(); today.setHours(0,0,0,0);
@@ -4071,7 +4348,7 @@ function renderHoy(){
     if(wk && wk.steps) weekSteps = wk.steps;
   }
 
-  let html = '';
+  let html = renderAvisos();
 
   // Top: deadline + day summary
   html += `<div class="hoy-grid">`;
@@ -6351,7 +6628,10 @@ function importAIPlan(txt){
     if(data.weekly_plan){
       STATE.weeklyPlan = {
         ...data,
-        stepDone: STATE.weeklyPlan?.stepDone || {}
+        // sello temporal: permite detectar despues, sin gastar un token, que
+        // el plan se ha quedado viejo respecto a lo que ha cambiado desde el
+        stepDone: STATE.weeklyPlan?.stepDone || {},
+        generatedAt: Date.now()
       };
       logChange('update', `plan de trabajo regenerado`);
 
