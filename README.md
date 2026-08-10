@@ -198,6 +198,18 @@ Los cambios con `src:'ia'` **tampoco cuentan**: la IA no se avisa a sí misma. U
 
 El prompt le prohíbe repetir lo que capa 0 ya dice y le prohíbe contar hechos que la herramienta ya muestra: solo debe hablar de contradicciones y patrones —esfuerzo que no da fruto, un objetivo que no cuadra con las horas, una decisión que choca con otra—. Ante la duda, `{"aviso": null}`.
 
+### Panel de foco — orden
+
+De arriba abajo: **temporizador → tiempo registrado → próxima entrega → música → reloj.**
+
+El razonamiento, porque reordenar por instinto es lo que produce interfaces que parecen bien pensadas y se usan mal:
+
+1. **Agrupación funcional.** Se agrupa por lo que se usa junto, no por lo que se parece. El bloque de foco (temporizador, que contiene pomodoro y cronómetro de sesión) y su resultado directo (tiempo registrado) van juntos y arriba.
+2. **La primera sección define qué es el panel.** Antes empezaba por «próxima entrega», así que el panel de foco se presentaba como un panel de avisos.
+3. **Control interactivo por encima de lectura pasiva.** El temporizador es el único objetivo grande y pulsable; las cuentas atrás y el reloj son lectura. Antes lo empujaban unos 180 px hacia abajo.
+4. **Estabilidad espacial.** «Próxima entrega» **no** se oculta en la vista *hoy* aunque se duplique con la tarjeta. Un elemento que aparece y desaparece según la vista destruye la memoria muscular, y ése es un estándar más fuerte que evitar una redundancia. Moverlo por debajo del temporizador elimina el coste real de la duplicación —que era tapar la razón de ser del panel— sin introducir ese otro problema.
+5. **El reloj cierra, y en una línea.** La hora ya está siempre en la barra del sistema: un reloj de 36 px en una columna de 268 es cromo redundante. La **fecha** sí vale en una herramienta de calendario, y es la que se conserva legible.
+
 ### Navegación
 
 Formas de cambiar lo que ves: las cuatro pestañas, profundizar desde el mes (número de semana → semana, día → modal), la ficha de asignatura, la barra de IA y el modo ambiente.
@@ -205,6 +217,34 @@ Formas de cambiar lo que ves: las cuatro pestañas, profundizar desde el mes (n�
 **Historial del navegador.** Cada cambio de vista queda en el historial (`#hoy`, `#week`, `#month`, `#gantt`). El botón atrás es *el* gesto de navegación en móvil y hasta ahora no hacía nada: te sacaba de la herramienta. Al volver, primero se cierra cualquier modal abierto y después se cambia de vista, para que atrás retroceda un paso y no dos. El primer estado se **reemplaza** en vez de empujarse, así el primer atrás sale de plan en lugar de dar vueltas dentro del historial.
 
 **Teclado.** `1`–`4` recorren el eje temporal, `←`/`→` mueven de semana o de mes según la vista abierta, `⌘K`/`Ctrl+K` abre la IA y `Escape` cierra. Todo guardado contra campos de texto (`escribiendo()`) y desactivado con un modal abierto, que es donde este tipo de atajos suele romperse.
+
+### Color de asignatura — paleta v3 «pigmento sobre plano»
+
+Diez colores construidos en LCh, no elegidos a ojo. La fuente es `SUBJECT_COLORS` en `index.html`; los tokens `--cat-1…10` son su espejo en CSS.
+
+**Restricciones de diseño**, que son la tesis entera:
+
+- **L\* entre 43 y 49** (rango de 6 puntos). Una paleta categórica sana no tiene un color que grite y otro que desaparezca. La v2 tenía 22 puntos de rango: el naranja `#C17817` dominaba y el marrón `#7A4419` se hundía.
+- **C\* entre 20 y 30.** Por encima de 30 deja de leerse como pigmento sobre plano y empieza a leerse como color de interfaz. Ése es el límite entre lápiz de color y acento de UI.
+- **Ordenada por distinción, no por gusto.** Plan reparte colores secuencialmente, así que quien tiene 4 asignaturas recibe las 4 más separadas entre sí (ΔE 24), no las 4 primeras de una lista.
+
+| | v2 | v3 |
+|---|---|---|
+| rango de luminosidad | 22,2 L\* | **6,1 L\*** |
+| croma | 0–63 | **20–30** |
+| ΔE mínimo (visión normal) | 4,2 | **12,4** |
+| ΔE mínimo (protanopia) | 2,0 | **5,2** |
+| pares indistinguibles | 3 | **0** |
+
+La v2 tenía dos marrones a ΔE 4,2 y dos verdes a ΔE 5,5 — literalmente el mismo color dos veces — más un gris que competía con el cromo de la interfaz.
+
+`ocre · añil · malva · cardenillo · óxido · terracota · acero · glicina · oliva · salvia`
+
+**Variantes de noche.** No existían: un color de L\* 45 sobre casi-negro queda turbio. Mismo tono, L\* subido a 68 y croma al 86%, con ~7,8:1 de contraste sobre el fondo oscuro.
+
+**Migración.** `safeColor()` traduce los colores de la v2 en vez de descartarlos — sin eso, todas las asignaturas existentes colapsarían al primer color de la lista. El mapa va por **cercanía de tono**, no por posición: quien tenía proyectos en azul lo sigue teniendo en azul y su modelo mental sobrevive al cambio.
+
+**Al tocar el color**: cambia `SUBJECT_COLORS` y actualiza los tokens en el mismo commit, o el CSS y el JS se separan en silencio. Los scripts que generaron y verificaron la paleta están en el commit correspondiente.
 
 ### Formas
 

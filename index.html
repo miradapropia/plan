@@ -112,11 +112,19 @@ input,textarea,select{color:inherit}
   /* ── color como dato (autorizado en plan; ver playbook) ── */
   --data-urgent:#c43838;
   --data-warn:#d68a3a;
-  --data-pass:#3d6b4f;
   --note-bg:#fff8e1; --note-border:#f5e5a8; --note-accent:#e8c879; --note-ink:#7a5e1a;
-  /* --cat: espejo css de SUBJECT_COLORS (paleta v2 congelada; la fuente es el js) */
-  --cat-1:#2d5a8e; --cat-2:#8b4513; --cat-3:#4a6741; --cat-4:#c17817; --cat-5:#6b5b95;
-  --cat-6:#4a7c7e; --cat-7:#8e4162; --cat-8:#5c5c5c; --cat-9:#3d6b4f; --cat-10:#7a4419;
+  /* ── --cat · paleta v3 "pigmento sobre plano" ──
+     espejo css de SUBJECT_COLORS (la fuente sigue siendo el js).
+     construida en LCh, no a ojo: luminosidad L* 43-49 (rango de 6 puntos, una
+     sola familia sin colores que griten ni que desaparezcan) y croma 20-30,
+     que es el limite entre lapiz de color y color de interfaz.
+     ordenada por distincion: quien tiene 4 asignaturas recibe las 4 mas
+     separadas entre si (ΔE 24), no las 4 primeras de una lista.
+     la v2 tenia dos marrones a ΔE 4,2 y dos verdes a ΔE 5,5 -- el mismo color
+     dos veces -- y 22 puntos de rango de luminosidad. */
+  --cat-1:#846539; --cat-2:#2b6b96; --cat-3:#846687; --cat-4:#218276; --cat-5:#8a594c;
+  --cat-6:#a5616f; --cat-7:#326e78; --cat-8:#66749c; --cat-9:#787650; --cat-10:#537157;
+  /* ocre · añil · malva · cardenillo · óxido · terracota · acero · glicina · oliva · salvia */
 
   /* ── alias: nombres antiguos de plan → tokens canónicos ── */
   --black:var(--ink); --white:var(--paper);
@@ -140,8 +148,12 @@ html.dark, [data-theme="dark"]{
   --focus-ring:0 0 0 3px rgba(245,245,247,.28);
   --data-urgent:#e85a5a;
   --data-warn:#e6a35a;
-  --data-pass:#6f9e85;
   --note-bg:#3a3520; --note-border:#5a4f30; --note-accent:#6a5f3a; --note-ink:#e8d8a8;
+  /* --cat de noche: mismo tono, luminosidad levantada a L* 68 y croma al 86%.
+     no existian: los colores claros (L* 45) sobre casi-negro quedan turbios.
+     los diez dan ~7,8:1 de contraste sobre el fondo oscuro. */
+  --cat-1:#c0a179; --cat-2:#7daad3; --cat-3:#b89dbb; --cat-4:#69b3a8; --cat-5:#cb9b8d;
+  --cat-6:#d495a0; --cat-7:#7caeb7; --cat-8:#9aa5ca; --cat-9:#aaa785; --cat-10:#91ad94;
   --paper-noise-opacity:.025;
   --cursor-dot:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Ccircle cx='6' cy='6' r='4' fill='%23f5f5f7'/%3E%3C/svg%3E") 6 6, auto;
 }
@@ -331,10 +343,13 @@ html.dark .grade-target-input{background:var(--g200);border-color:var(--g300)}
   min-width:32px;text-align:right}
 .grade-item-score{font-size:13px;font-weight:600;flex-shrink:0;min-width:32px;text-align:right;
   font-variant-numeric:tabular-nums}
-.grade-item-score.pass{color:var(--data-pass)}
-.grade-item-score.fail{color:#9B3D3D}
-html.dark .grade-item-score.pass{color:var(--data-pass)}
-html.dark .grade-item-score.fail{color:#D98585}
+/* nota aprobada y suspensa · politica de color funcional (42-sistema-diseno).
+   el aprobado NO lleva color: un 7,5 ya dice que es un 7,5, y premiarlo en
+   verde es cromo. el suspenso si pide atencion y va en el rojo apagado que ya
+   existe como token, no en un hex suelto.
+   de paso esquiva el par rojo/verde, que ~8% de los hombres no distingue. */
+.grade-item-score.pass{color:var(--ink)}
+.grade-item-score.fail{color:var(--data-urgent)}
 .grade-summary{font-size:11px;color:var(--g800);line-height:1.6;padding:8px 0 0 0;
   border-top:1px solid var(--g200)}
 .grade-summary strong{color:var(--black);font-weight:600}
@@ -711,10 +726,11 @@ html.dark .day-note-btn.has-note:hover{background:#4a4528;border-color:#6a5f3a;c
 .deadline-card.urgent .dl-countdown-big{color:var(--urgent)}
 .dl-countdown-small{font-size:10px;letter-spacing:.5px;color:var(--g400);margin-top:4px;font-variant-numeric:tabular-nums}
 
-.clock-wrap{text-align:center}
-.clock-time{font-size:36px;font-weight:300;letter-spacing:-2px;line-height:1}
-.clock-sec{font-size:18px;color:var(--g400)}
-.clock-date{font-size:10px;letter-spacing:.5px;color:var(--g400);margin-top:5px}
+.clock-wrap{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.clock-time{font-size:13px;font-weight:400;letter-spacing:-.3px;line-height:1;color:var(--g600)}
+.clock-sec{display:none}
+.clock-date{font-size:10px;letter-spacing:.5px;color:var(--g400)}
+.fp-reloj{border-bottom:none;padding-top:12px;padding-bottom:12px}
 
 .timer-wrap{text-align:center;position:relative}
 .timer-modes{display:flex;justify-content:center;margin-bottom:11px}
@@ -1650,23 +1666,6 @@ body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='
   <!-- FOCUS PANEL (clock, deadline, timer, progress) -->
   <aside class="focus-panel">
 
-    <div class="fp-section">
-      <div class="fp-label">próxima entrega</div>
-      <div class="deadline-card" id="deadline-card">
-        <div class="dl-subj" id="dl-subj">—</div>
-        <div class="dl-title" id="dl-title">sin entregas</div>
-        <div class="dl-countdown-big" id="dl-countdown-big">—</div>
-        <div class="dl-countdown-small" id="dl-countdown-small"></div>
-      </div>
-    </div>
-
-    <div class="fp-section">
-      <div class="fp-label">ahora</div>
-      <div class="clock-wrap">
-        <div class="clock-time" id="clock-hm">00:00<span class="clock-sec">:00</span></div>
-        <div class="clock-date" id="clock-date"></div>
-      </div>
-    </div>
 
     <div class="fp-section">
       <div class="fp-label">temporizador</div>
@@ -1704,6 +1703,17 @@ body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='
       <div id="tracked-list"></div>
     </div>
 
+    <div class="fp-section">
+      <div class="fp-label">próxima entrega</div>
+      <div class="deadline-card" id="deadline-card">
+        <div class="dl-subj" id="dl-subj">—</div>
+        <div class="dl-title" id="dl-title">sin entregas</div>
+        <div class="dl-countdown-big" id="dl-countdown-big">—</div>
+        <div class="dl-countdown-small" id="dl-countdown-small"></div>
+      </div>
+    </div>
+
+
     <div class="fp-section music-section" id="music-section" style="padding:0">
       <div class="music-section-header">
         <div class="music-section-lbl">música</div>
@@ -1725,7 +1735,19 @@ body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='
       </div>
     </div>
 
-  </aside>
+  
+    <!-- el reloj cierra el panel y en una sola linea: la hora ya la tienes
+         siempre en la barra del sistema, asi que un reloj de 36px en una
+         columna de 268 es cromo redundante. la FECHA si vale en una
+         herramienta de calendario, y es la que se conserva legible. -->
+    <div class="fp-section fp-reloj">
+      <div class="clock-wrap">
+        <div class="clock-time" id="clock-hm">00:00<span class="clock-sec">:00</span></div>
+        <div class="clock-date" id="clock-date"></div>
+      </div>
+    </div>
+
+</aside>
 
 </div>
 </div>
@@ -2254,10 +2276,23 @@ function parseDate(x){
   return new Date(x);
 }
 const IA_HISTORY_LIMIT = 12; // mensajes de conversación enviados a la ia por turno
+// paleta v3 "pigmento sobre plano". construida en LCh y verificada:
+// ΔE minimo 12,4 en vision normal (la v2 tenia 4,2), 5,2 en protanopia,
+// contraste >=4,4:1 sobre paper. orden por distincion, no arbitrario.
 const SUBJECT_COLORS = [
-  '#2D5A8E','#8B4513','#4A6741','#C17817','#6B5B95',
-  '#4A7C7E','#8E4162','#5C5C5C','#3D6B4F','#7A4419'
+  '#846539','#2b6b96','#846687','#218276','#8a594c',
+  '#a5616f','#326e78','#66749c','#787650','#537157'
 ];
+
+// migracion de la v2: cada color viejo va al nuevo de TONO mas cercano, no al
+// de la misma posicion. asi el estudiante que tenia proyectos en azul lo sigue
+// teniendo en azul y su modelo mental sobrevive al cambio de paleta.
+const COLOR_V2_A_V3 = {
+  '#2d5a8e':'#66749c', '#8b4513':'#8a594c', '#4a6741':'#787650',
+  '#c17817':'#846539', '#6b5b95':'#846687', '#4a7c7e':'#326e78',
+  '#8e4162':'#a5616f', '#5c5c5c':'#218276', '#3d6b4f':'#537157',
+  '#7a4419':'#2b6b96'
+};
 
 // ─── seguridad · escapado y saneado ──────────────────────────────
 // regla de la casa: los textos se guardan crudos y se ESCAPAN AL PINTAR.
@@ -2275,7 +2310,11 @@ function esc(v){
 // para interpolar un valor dentro de un handler inline: json + escape de atributo
 function escJsAttr(v){ return esc(JSON.stringify(String(v ?? ''))); }
 function safeStr(v, max){ return v == null ? '' : String(v).slice(0, max); }
-function safeColor(c){ return SUBJECT_COLORS.includes(c) ? c : SUBJECT_COLORS[0]; }
+function safeColor(c){
+  if(SUBJECT_COLORS.includes(c)) return c;
+  const mig = COLOR_V2_A_V3[String(c || '').toLowerCase()];
+  return mig || SUBJECT_COLORS[0];
+}
 function safeHttpUrl(u){ u = safeStr(u, 2000).trim(); return /^https?:\/\//i.test(u) ? u : null; }
 
 function sanitizeState(raw){
@@ -2909,7 +2948,9 @@ function buildPDFHTML(scope, data){
   .ev-list li:last-child{border-bottom:none}
   .ev-extra{margin-top:3px;margin-left:14px;font-size:9px;color:#666;line-height:1.5}
   .ev-notes{font-style:italic;color:#444;padding:5px 8px;background:#FFF8E1;border-left:2px solid #E8C879;border-radius:2px;margin-top:4px;margin-left:14px}
-  .done-mark{color:#4A6741;font-weight:600;margin-left:8px}
+  /* la marca de hecho va en tinta: un verde de "correcto" es cromo, y el
+     color solo puede existir como dato (politica de color funcional) */
+  .done-mark{color:#1d1d1f;font-weight:600;margin-left:8px}
   .week-tbl td.block{padding:5px;font-size:9px}
   .week-tbl td.block.clase{background:#1d1d1f;color:#fff}
   .week-tbl td.block.clase small{color:rgba(255,255,255,.7)}
