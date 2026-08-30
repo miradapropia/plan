@@ -1,12 +1,58 @@
+# plan.miradapropia.org · robots
 User-agent: *
 Allow: /
 Disallow: /.netlify/
 
-# Block specific bots that scrape content
+# rastreadores de modelos de lenguaje · acceso explícito permitido.
+# hasta 2026-08-30 este archivo bloqueaba GPTBot y CCBot. plan no tiene
+# búsqueda propia detrás: la citación por asistentes de IA es su único canal
+# orgánico, así que bloquearlos cerraba la única puerta que tenía.
 User-agent: GPTBot
-Disallow: /
+Allow: /
+Disallow: /.netlify/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /.netlify/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /.netlify/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /.netlify/
+
+User-agent: Claude-User
+Allow: /
+Disallow: /.netlify/
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /.netlify/
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /.netlify/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /.netlify/
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /.netlify/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /.netlify/
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /.netlify/
 
 User-agent: CCBot
-Disallow: /
+Allow: /
+Disallow: /.netlify/
 
 Sitemap: https://plan.miradapropia.org/sitemap.xml

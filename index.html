@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
 <!-- Primary SEO -->
-<title>plan · organizador académico para estudiantes de arquitectura | miradapropia</title>
+<title>organizador del curso para estudiantes de arquitectura</title>
 <meta name="description" content="plan es un organizador académico gratuito para estudiantes de arquitectura. planifica tu cuatrimestre con ia: entregas, exámenes, horario semanal, diagrama de gantt, temporizador pomodoro y notas. sin registro."/>
 <meta name="keywords" content="organizador académico, planificador estudiantes arquitectura, gestor de tareas universidad, calendario académico, gantt estudiantes, planificación cuatrimestre, herramienta estudio arquitectura, pomodoro arquitectura, planificador con ia, miradapropia"/>
 <meta name="author" content="miradapropia"/>
@@ -87,6 +87,54 @@
     "Exportación a PDF y formato iCal",
     "Sin registro ni cuenta",
     "Funciona offline tras la primera carga"
+  ]
+}
+</script>
+
+<!-- Structured data: FAQPage.
+     Las preguntas y las respuestas son las MISMAS que están escritas en el
+     bloque #que-es del cuerpo. Si se edita una, hay que editar la otra: un
+     FAQPage que no coincide con el texto visible es motivo de penalización. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "¿Hay que registrarse para usar plan?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. No hay cuentas ni contraseñas. El plan se guarda en el almacenamiento local del navegador, en el propio ordenador del estudiante. Si se borran los datos del navegador o se cambia de dispositivo, el plan se pierde: por eso conviene exportar la copia en JSON desde datos → exportar." }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Qué diferencia hay entre las cuatro vistas de plan?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Son la misma información a distinta distancia. Hoy es el día concreto y lo que vence pronto. Semana es el horario de clase con los bloques reales. Mes es el calendario clásico. Cuatrimestre es un diagrama de gantt donde cada asignatura ocupa una banda y las entregas aparecen como hitos, que es la vista que permite detectar dos entregas en la misma semana con tiempo para reaccionar." }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Qué hace el panel de IA de plan?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Permite describir el cuatrimestre en lenguaje normal y crea a partir de ahí las asignaturas, el horario y los eventos, en lugar de teclearlos uno a uno. También responde preguntas sobre el plan del propio estudiante. Al modelo se envía el mensaje y un resumen del plan (asignaturas, medias, nota objetivo y horas), solo para generar la respuesta; no se almacena en ningún servidor propio." }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Cómo funciona la nota objetivo?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Se indica la nota que se quiere sacar en una asignatura y, con las notas parciales ya obtenidas y el peso de cada una, plan calcula qué hace falta en lo que queda. Sirve sobre todo para identificar cuándo una asignatura ya está resuelta y no necesita más horas." }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Se pueden exportar las fechas a Google Calendar o Apple Calendario?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Sí. La exportación a ICS genera un archivo que importan Google Calendar, Apple Calendario y Outlook. Las entregas y exámenes entran como eventos del calendario." }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Sirve plan para organizar el TFG?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Sí, tratando el TFG como una asignatura larga con hitos: entrega de índice, capítulos, revisión del tutor y depósito. La vista de cuatrimestre en diagrama de gantt es la más adecuada, porque el TFG se solapa con el resto de asignaturas durante meses." }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Qué es el modo ambiente de plan?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Una pantalla de trabajo a pantalla completa con reloj, cuenta atrás de la próxima entrega y temporizador sobre un fondo tranquilo, pensada para dejarla puesta durante sesiones de estudio largas." }
+    }
   ]
 }
 </script>
@@ -206,11 +254,40 @@ html.dark .cal-note-btn{background:var(--g100);border-color:var(--g300)}
 html.dark .cal-note-btn:hover{background:var(--g200);color:var(--black);border-color:var(--g400)}
 html.dark .day-note-btn{background:var(--g100);border-color:var(--g300)}
 html.dark .day-note-btn:hover{background:var(--g200);border-color:var(--g400)}
-html,body{height:100%;background:var(--white);color:var(--black);
+/* la app ocupa exactamente una pantalla; DEBAJO de ella va el bloque de texto
+   servido (#que-es). por eso el documento tiene que poder desplazarse: si el
+   body siguiera con overflow:hidden, ese texto estaria en el DOM pero seria
+   inalcanzable para una persona — texto oculto, que es justo lo que google
+   penaliza. el scroll vive en el body; todo lo flotante (modales, toast,
+   ambiente, sidebar movil) es position:fixed y no se ve afectado. */
+html{height:100%;overflow:hidden}
+body{height:100%;background:var(--white);color:var(--black);
   font-family:'Inter',sans-serif;font-size:14px;line-height:1.6;
-  -webkit-font-smoothing:antialiased;overflow:hidden}
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain}
+/* el modo ambiente es pantalla completa: ahi no se desplaza nada */
+body.ambient-on{overflow:hidden}
 
 .app{display:flex;flex-direction:column;height:100vh;overflow:hidden;position:relative}
+
+/* ── TEXTO SERVIDO ────────────────────────────────────────────────
+   bloque de contenido presente en el HTML QUE SIRVE EL SERVIDOR, no
+   montado por javascript. los rastreadores de los asistentes de IA
+   (GPTBot, ClaudeBot, PerplexityBot) no ejecutan js: sin esto plan es
+   una pantalla en blanco para ellos y no hay nada que puedan citar.
+   plan no tiene busqueda propia detras, asi que la citabilidad es su
+   unico canal organico. */
+.lee{max-width:66ch;margin:0 auto;padding:64px 24px 72px;border-top:1px solid var(--g200)}
+.lee h1{font-size:22px;font-weight:500;letter-spacing:-.4px;margin-bottom:16px;color:var(--black)}
+.lee h2{font-size:15px;font-weight:600;letter-spacing:-.2px;margin:36px 0 10px;color:var(--black)}
+.lee h3{font-size:13px;font-weight:600;margin:20px 0 4px;color:var(--black)}
+.lee p{font-size:13px;line-height:1.75;color:var(--g600);margin-bottom:10px}
+.lee ul{margin:0 0 10px 18px}
+.lee li{font-size:13px;line-height:1.75;color:var(--g600);margin-bottom:4px}
+.lee a{color:var(--black);text-decoration:none;border-bottom:1px solid var(--g300)}
+.lee a:hover{border-bottom-color:var(--black)}
+html.dark .lee{border-top-color:var(--g200)}
+@media(max-width:640px){.lee{padding:44px 20px 56px}}
 .app::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:1000;opacity:var(--paper-noise-opacity);
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size:180px 180px}
@@ -1586,6 +1663,9 @@ body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='
       <a href="https://www.youtube.com/channel/UCzWV3nRSb0MVG_CivIvBwfw" class="sb-link" target="_blank" rel="noopener"><span>youtube</span><span class="sb-link-arrow">↗</span></a>
       <a href="https://miradapropia.org/recursos-estudiantes-arquitectura/" class="sb-link" target="_blank" rel="noopener"><span>taller</span><span class="sb-link-arrow">↗</span></a>
       <a href="https://newsletter.miradapropia.org/" class="sb-link" target="_blank" rel="noopener"><span>newsletter</span><span class="sb-link-arrow">↗</span></a>
+      <!-- desplaza sin tocar el hash: la URL con # la gestiona la navegación
+           entre vistas (sincronizarHistorial), y un #que-es ahí lo pisaría. -->
+      <a href="#que-es" class="sb-link" onclick="event.preventDefault();document.getElementById('que-es').scrollIntoView({behavior:'smooth',block:'start'})"><span>qué es plan</span><span class="sb-link-arrow">↓</span></a>
     </div>
     <div class="sb-section" style="flex:1">
       <div class="sb-label" style="display:flex;justify-content:space-between;align-items:center;padding-right:13px">
@@ -1751,6 +1831,50 @@ body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='
 
 </div>
 </div>
+
+<section class="lee" id="que-es">
+  <h1>organizador del curso para estudiantes de arquitectura</h1>
+
+  <p>un cuatrimestre de arquitectura no se parece a ninguna otra carrera: proyectos con entregas intermedias que se solapan, correcciones semanales, prácticas de construcción, exámenes de estructuras y un taller que se come todas las horas que le dejes. plan sirve para verlo entero antes de que te pase por encima, y para saber en qué asignatura estás perdiendo tiempo y en cuál te estás jugando la nota.</p>
+
+  <p>metes las asignaturas del cuatrimestre, el horario de clase y las fechas de entregas y exámenes. a partir de ahí lo mismo se lee a cuatro distancias distintas, del día al cuatrimestre entero: <strong>hoy</strong> para lo inmediato, <strong>semana</strong> para el horario, <strong>mes</strong> para el calendario, y <strong>cuatrimestre</strong> como diagrama de gantt, que es donde se ve el choque de dos entregas en la misma semana con tiempo para reaccionar.</p>
+
+  <p>además lleva temporizador con sesiones de trabajo por asignatura, notas ponderadas con nota objetivo (te dice qué necesitas sacar en lo que queda), un panel de ia al que le puedes dictar el cuatrimestre en lenguaje normal en vez de rellenar formularios, y modo ambiente para trabajar. es gratis, no pide registro y todo se guarda en tu propio navegador.</p>
+
+  <h2>qué pide y qué devuelve</h2>
+  <ul>
+    <li>pide: asignaturas, créditos, horario semanal, entregas, exámenes y notas conforme las vas teniendo</li>
+    <li>devuelve: cuatro vistas del mismo cuatrimestre (hoy, semana, mes y gantt), cuenta atrás de la próxima entrega, horas registradas por asignatura y media ponderada con nota objetivo</li>
+    <li>exporta a pdf para imprimir, a ics para meterlo en tu calendario y a json como copia de seguridad</li>
+    <li>funciona sin conexión una vez cargado, y se sincroniza entre pestañas abiertas del mismo navegador</li>
+  </ul>
+
+  <h2>preguntas frecuentes</h2>
+
+  <h3>¿hay que registrarse?</h3>
+  <p>no. no hay cuentas ni contraseñas. tu plan se guarda en el almacenamiento local de tu navegador, en tu propio ordenador (computadora). eso tiene una contrapartida: si borras los datos del navegador o cambias de dispositivo, el plan se pierde. por eso conviene exportar la copia en json de vez en cuando, desde datos → exportar.</p>
+
+  <h3>¿qué diferencia hay entre las cuatro vistas?</h3>
+  <p>son la misma información a distinta distancia, como un zoom sobre el tiempo. hoy es el día concreto y lo que vence pronto. semana es el horario de clase con los bloques reales. mes es el calendario clásico. cuatrimestre es un diagrama de gantt donde cada asignatura ocupa una banda y las entregas se ven como hitos: es la vista que sirve para detectar que dos entregas caen en la misma semana antes de que sea tarde.</p>
+
+  <h3>¿qué hace exactamente el panel de ia?</h3>
+  <p>le describes el cuatrimestre en lenguaje normal —"tengo proyectos 3 los martes y jueves de 9 a 14, la primera entrega el 20 de octubre"— y él crea las asignaturas, el horario y los eventos, en vez de que los teclees uno a uno. también responde preguntas sobre tu propio plan. lo que se envía al modelo es tu mensaje y un resumen de tu plan (asignaturas, medias, nota objetivo y horas), solo para generar la respuesta; no se guarda en ningún servidor nuestro. está detallado en el aviso de privacidad de la propia herramienta.</p>
+
+  <h3>¿cómo funciona la nota objetivo?</h3>
+  <p>pones la nota que quieres sacar en una asignatura y, con las notas parciales que ya tienes y el peso de cada una, plan calcula qué te hace falta en lo que queda. sirve sobre todo para lo contrario de lo que parece: para ver cuándo una asignatura ya está resuelta y puedes dejar de gastarle horas.</p>
+
+  <h3>¿puedo llevarme las fechas a mi calendario?</h3>
+  <p>sí. la exportación a ics genera un archivo que importan google calendar, apple calendario y outlook. las entregas y exámenes entran como eventos; el resto lo sigues llevando aquí.</p>
+
+  <h3>¿sirve para el tfg?</h3>
+  <p>sí, tratándolo como una asignatura larga con hitos: entrega de índice, capítulos, revisión del tutor y depósito. la vista de cuatrimestre es la que mejor lo aguanta, porque el tfg es precisamente el trabajo que se solapa con todo lo demás durante meses.</p>
+
+  <h3>¿qué es el modo ambiente?</h3>
+  <p>una pantalla de trabajo a pantalla completa con reloj, cuenta atrás de la próxima entrega y temporizador sobre un fondo tranquilo, pensada para dejarla puesta mientras trabajas o para sesiones de estudio largas.</p>
+
+  <h2>otras herramientas</h2>
+  <p>plan forma parte de las <a href="https://miradapropia.org/recursos-estudiantes-arquitectura/">herramientas gratuitas de miradapropia</a> para estudiantes de arquitectura, junto al <a href="https://comparador-portatiles.miradapropia.org">comparador de portátiles</a>, el <a href="https://entregas.miradapropia.org">ensamblador de entregas</a>, el <a href="https://estructuras-elu.miradapropia.org">comprobador estructural elu</a>, las <a href="https://universidades.miradapropia.org">notas de corte de arquitectura</a> y el asistente <a href="https://gu-ia.miradapropia.org">guIA</a>.</p>
+</section>
 
 <!-- SPOTLIGHT — view appears here when a nav pill is clicked in ambient mode -->
 <div class="spotlight" id="spotlight">
