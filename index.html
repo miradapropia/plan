@@ -1498,6 +1498,42 @@ body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='
     scroll-behavior:auto !important;
   }
 }
+
+/* ── PIE COMPARTIDO DEL ECOSISTEMA ────────────────────────────────
+   Mismo bloque en las once herramientas. Patrón canónico tomado de
+   asistente-software. Los tokens llevan respaldo literal para que
+   funcione igual donde mp.css aún no está copiado. */
+.mp-foot{border-top:1px solid var(--g-100,#e8e8ed);background:var(--g-50,#f5f5f7);
+  padding:34px 34px 30px;margin-top:10px;text-align:left}
+.mp-foot-in{max-width:960px;margin:0 auto;display:grid;
+  grid-template-columns:1.15fr 1fr;gap:34px;align-items:start}
+.mp-foot-t{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--g-400,#86868b);margin-bottom:12px;display:block;font-weight:400}
+.mp-links{display:flex;flex-wrap:wrap;gap:7px}
+.mp-links a{font-size:13px;line-height:1.4;color:var(--ink,#1d1d1f);text-decoration:none;
+  background:var(--paper-pure,#ffffff);border:1px solid var(--g-100,#e8e8ed);
+  border-radius:980px;padding:6px 13px;
+  box-shadow:0 1px 2px rgba(0,0,0,.04),0 1px 3px rgba(0,0,0,.06);
+  transition:box-shadow 240ms cubic-bezier(.4,0,.2,1),transform 120ms cubic-bezier(.4,0,.2,1)}
+.mp-links a:hover{box-shadow:0 2px 8px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.06);
+  transform:translateY(-1px)}
+.mp-links a:active{transform:scale(.97)}
+.mp-foot-nl{font-size:13px;line-height:1.65;color:var(--g-600,#515154);margin-top:18px}
+.mp-foot-nl a{color:var(--ink,#1d1d1f);text-decoration:none;
+  border-bottom:1px solid var(--g-200,#d2d2d7)}
+.mp-foot-nl a:hover{border-bottom-color:var(--ink,#1d1d1f)}
+.mp-foot-nota{max-width:960px;margin:22px auto 0;font-size:11px;line-height:1.6;
+  color:var(--g-400,#86868b)}
+.mp-legal{max-width:960px;margin:26px auto 0;padding-top:16px;
+  border-top:1px solid var(--g-100,#e8e8ed);
+  display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+.mp-legal span,.mp-legal a{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--g-400,#86868b);text-decoration:none}
+.mp-legal a:hover{color:var(--ink,#1d1d1f)}
+@media(max-width:720px){
+  .mp-foot{padding:26px 16px 24px}
+  .mp-foot-in{grid-template-columns:1fr;gap:26px}
+}
 </style>
 <script type="module">
   // Load PDF.js for in-browser PDF text extraction (avoids sending heavy base64 PDFs
@@ -7957,5 +7993,40 @@ setupDragAndDrop();
   }
 })();
 </script>
+<footer class="mp-foot">
+    <div class="mp-foot-in">
+      <div>
+        <span class="mp-foot-t">el resto del taller</span>
+        <nav class="mp-links" aria-label="otras herramientas de miradapropia">
+          <a href="https://comparador-portatiles.miradapropia.org" target="_blank" rel="noopener">comparador de portátiles</a>
+          <a href="https://gu-ia.miradapropia.org" target="_blank" rel="noopener">guía con ia</a>
+          <a href="https://entregas.miradapropia.org" target="_blank" rel="noopener">montar la entrega en pdf</a>
+          <a href="https://universidades.miradapropia.org" target="_blank" rel="noopener">notas de corte</a>
+          <a href="https://estructuras-elu.miradapropia.org" target="_blank" rel="noopener">comprobación elu</a>
+          <a href="https://asistente-software.miradapropia.org" target="_blank" rel="noopener">atajos de software</a>
+          <a href="https://escalas.miradapropia.org" target="_blank" rel="noopener">convertidor de escalas</a>
+          <a href="https://calculadora-punto-rocio.miradapropia.org" target="_blank" rel="noopener">punto de rocío</a>
+          <a href="https://superficies.miradapropia.org" target="_blank" rel="noopener">programa de necesidades</a>
+          <a href="https://proporciones.miradapropia.org" target="_blank" rel="noopener">sistema de proporciones</a>
+        </nav>
+      </div>
+      <div>
+        <span class="mp-foot-t">lee también</span>
+        <nav class="mp-links" aria-label="artículo relacionado">
+          <a href="https://miradapropia.org/2026/07/28/primero-de-arquitectura/" target="_blank" rel="noopener">primero de arquitectura, mes a mes</a>
+        </nav>
+        <p class="mp-foot-nl"><a href="https://newsletter.miradapropia.org/" target="_blank" rel="noopener">recibe la newsletter</a> — cada semana, obras, herramientas y construcción para clase.</p>
+      </div>
+    </div>
+    <div class="mp-legal">
+      <span>plan · miradapropia</span>
+      <span>
+        <a href="https://miradapropia.org/recursos-estudiantes-arquitectura/" target="_blank" rel="noopener">taller</a> ·
+        <a href="https://miradapropia.org/politica-de-privacidad-miradapropia/" target="_blank" rel="noopener">privacidad</a> ·
+        <a href="https://miradapropia.org/contacto-miradapropia/" target="_blank" rel="noopener">contacto</a> ·
+        <a href="https://miradapropia.org" target="_blank" rel="noopener">miradapropia.org</a>
+      </span>
+    </div>
+  </footer>
 </body>
 </html>
