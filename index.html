@@ -86,7 +86,7 @@
     "Modo oscuro",
     "Exportación a PDF y formato iCal",
     "Sin registro ni cuenta",
-    "Funciona offline tras la primera carga"
+    "Sigue funcionando sin conexión mientras la pestaña está abierta, salvo el panel de IA"
   ]
 }
 </script>
@@ -323,7 +323,7 @@ header{border-bottom:1px solid var(--g200);padding:12px 22px;
 .sb-section{padding:12px 0;border-bottom:1px solid var(--g200)}
 .sb-label{font-size:9px;letter-spacing:2px;color:var(--g400);padding:0 13px 7px}
 .sb-link{display:flex;align-items:center;justify-content:space-between;gap:8px;
-  margin:0 5px;padding:6px 8px;border-radius:var(--radius-sm);
+  margin:0 5px;padding:6px 8px;border-radius:var(--r);
   color:var(--g600);text-decoration:none;font-size:11px;cursor:pointer;
   transition:background .25s var(--ease), color .25s var(--ease), transform .15s var(--ease)}
 .sb-link:hover{background:var(--g100);color:var(--black)}
@@ -507,7 +507,7 @@ nav.tabs{border-bottom:1px solid var(--g200);display:flex;background:var(--white
    de interfaz, y el color solo puede existir como dato (42-sistema-diseno) */
 .tab.has-avisos::after{content:'';position:absolute;top:5px;right:5px;
   width:4px;height:4px;border-radius:50%;background:var(--ink);
-  animation:avisoIn var(--dur-short) var(--ease-out) both}
+  animation:avisoIn var(--dur-fast) var(--ease-out) both}
 .tab.active.has-avisos::after{display:none}
 .tab:hover{color:var(--black);background:var(--g100)}
 .tab.active{color:var(--black);background:var(--g100);box-shadow:inset 0 -2px 0 var(--black)}
@@ -1882,7 +1882,7 @@ body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='
     <li>pide: asignaturas, créditos, horario semanal, entregas, exámenes y notas conforme las vas teniendo</li>
     <li>devuelve: cuatro vistas del mismo cuatrimestre (hoy, semana, mes y gantt), cuenta atrás de la próxima entrega, horas registradas por asignatura y media ponderada con nota objetivo</li>
     <li>exporta a pdf para imprimir, a ics para meterlo en tu calendario y a json como copia de seguridad</li>
-    <li>funciona sin conexión una vez cargado, y se sincroniza entre pestañas abiertas del mismo navegador</li>
+    <li>una vez cargado sigue funcionando aunque te quedes sin conexión —todo menos la ia, que sí la necesita— y se sincroniza entre pestañas abiertas del mismo navegador</li>
   </ul>
 
   <h2>preguntas frecuentes</h2>
@@ -2559,7 +2559,6 @@ const DEFAULT_STATE = () => ({
 let STATE = DEFAULT_STATE();
 let selectedSubjId = null;
 let pendingFiles = [];
-let pendingConfirmation = null; // {description, action}
 
 function getWeekKey(d){
   const date = parseDate(d);
@@ -2634,10 +2633,9 @@ function saveState(change){
   propagar();
   if(change){
     pushChange(change);
-    // solo los cambios del estudiante ponen en marcha al vigilante: los de la
-    // ia no son novedad para ella misma
-    // solo los cambios ESTRUCTURALES del estudiante despiertan al vigilante.
-    // marcar hecho, un enlace o una nota no ponen ni el temporizador.
+    // solo los cambios ESTRUCTURALES del estudiante despiertan al vigilante:
+    // los de la ia no son novedad para ella misma, y marcar hecho, guardar un
+    // enlace o escribir una nota no ponen ni el temporizador.
     if(change.src !== 'ia' && typeof esCambioEstructural === 'function'
        && esCambioEstructural(change)) programarCapa1();
   }
@@ -4466,16 +4464,13 @@ function renderAll(){
 // renderActiveView solo pinta la vista abierta, asi que desde semana, mes o
 // cuatrimestre no se ven los avisos. este punto los delata sin ruido.
 function renderAvisoDot(){
-  const tab = document.querySelector('.tabs .tab[onclick*="\'hoy\'"]');
+  const tab = tabDeVista('hoy');
   if(!tab) return;
   let n = 0;
   try{ n = computeAvisos().length; }catch(e){}
   tab.classList.toggle('has-avisos', n > 0);
 }
 
-// ═══════════════════════════════════════════
-// HOY VIEW
-// ═══════════════════════════════════════════
 // ═══════════════════════════════════════════
 // CAPA 0 — AVISOS DETERMINISTAS
 // ═══════════════════════════════════════════
@@ -4510,9 +4505,12 @@ function computeAvisos(){
   const evaluables = e => e.type === 'entrega' || e.type === 'examen';
 
   // ── vencidas sin marcar ──────────────────────────────────────────────
-  const overdue = evs.filter(e => !e.done && evaluables(e) && parseDate(e.date) < today);
+  // ordenadas: STATE.events no lo esta, y sin esto el evento al que lleva "ver"
+  // dependia del orden de insercion. la mas antigua es la que lleva mas colgando.
+  const overdue = evs.filter(e => !e.done && evaluables(e) && parseDate(e.date) < today)
+    .sort((a, b) => parseDate(a.date) - parseDate(b.date));
   if(overdue.length){
-    const first = overdue[overdue.length - 1];
+    const first = overdue[0];
     out.push({
       key:'atrasadas', sig:'n'+overdue.length, level:'urgent',
       text: overdue.length === 1
@@ -4695,7 +4693,7 @@ function dismissAvisoAt(i){
 }
 
 function goToView(view){
-  const btn = document.querySelector(`.tabs .tab[onclick*="'${view}'"]`);
+  const btn = tabDeVista(view);
   if(btn) switchView(view, btn);
 }
 
@@ -4848,7 +4846,6 @@ async function ejecutarCapa1(){
     const base = computeAvisos();
     if(base.some(a => a.level === 'urgent')) return;
 
-    // solo cuentan los cambios del estudiante: los de la ia no son novedad
     // solo cuentan los cambios estructurales del estudiante: ni los de la ia
     // (no se avisa a si misma) ni la rutina (marcar hecho, enlaces, notas).
     // acotado a 25: con el anillo lleno el delta se iria a ~670 tokens, y son
@@ -4889,19 +4886,26 @@ async function ejecutarCapa1(){
 
     // 429: sin cupo. se apaga el resto del dia en vez de seguir insistiendo.
     if(res.status === 429){ st.n = CAPA1_MAX_DIA; saveState(); return; }
-    if(!res.ok) return;
+
+    // el chequeo YA se ha pedido y ya se ha pagado: cuenta como intento pase lo
+    // que pase con la respuesta. si solo contaran los que devuelven json legible,
+    // una racha de respuestas rotas se saltaria el intervalo y el cupo del dia,
+    // que son las dos guardas que sostienen esta capa.
+    st.at = Date.now();
+    st.hash = hash;
+    st.n = (st.n || 0) + 1;
+
+    // si la respuesta no se puede leer, se anota el intento y se deja EN PIE el
+    // aviso anterior: no hemos mirado, asi que no podemos decir que no hay nada.
+    if(!res.ok){ saveState(); return; }
 
     const d = await res.json();
     const raw = (d.content || []).map(c => c.text || '').join('').trim();
     const m = raw.match(/\{[\s\S]*\}/);
-    if(!m) return;
+    if(!m){ saveState(); return; }
 
     let parsed;
-    try{ parsed = JSON.parse(m[0]); }catch(e){ return; }
-
-    st.at = Date.now();
-    st.hash = hash;
-    st.n = (st.n || 0) + 1;
+    try{ parsed = JSON.parse(m[0]); }catch(e){ saveState(); return; }
 
     const av = parsed && parsed.aviso;
     if(av && typeof av.texto === 'string' && av.texto.trim()){
@@ -4925,6 +4929,9 @@ async function ejecutarCapa1(){
   }
 }
 
+// ═══════════════════════════════════════════
+// HOY VIEW
+// ═══════════════════════════════════════════
 function renderHoy(){
   const now = new Date();
   const today = new Date(); today.setHours(0,0,0,0);
@@ -5173,7 +5180,7 @@ function renderWeek(){
       <div class="day-sch-header" onclick="goToDay('${ds}')" style="cursor:pointer" title="ver detalle del día">
         <div class="day-sch-lbl">${DLBLS[i]}</div>
         <div class="day-sch-num">${d.getDate()}</div>
-        <button class="day-note-btn ${hasNote ? 'has-note' : ''}" onclick="event.stopPropagation();openNote('${ds}')" title="${hasNote ? 'nota: ' + hasNote.replace(/"/g,'&quot;') : 'añadir nota'}">
+        <button class="day-note-btn ${hasNote ? 'has-note' : ''}" onclick="event.stopPropagation();openNote('${ds}')" title="${hasNote ? esc('nota: ' + hasNote) : 'añadir nota'}">
           ${hasNote ? '✎' : '+'}
         </button>
       </div>
@@ -6619,9 +6626,6 @@ function renderChips(){
 // ═══════════════════════════════════════════
 // IA — system prompt + send
 // ═══════════════════════════════════════════
-// ═══════════════════════════════════════════
-// IA — system prompt + send
-// ═══════════════════════════════════════════
 // el prompt viaja en DOS bloques y el orden importa:
 //   1. IA_SYSTEM_STATIC — invariante (~3.300 tokens). es el prefijo cacheable:
 //      las lecturas de cache se facturan a 0,1x la tarifa de entrada, y sonnet
@@ -7035,7 +7039,10 @@ async function sendMsg(){
 
   }catch(err){
     if(typing.parentNode) typing.remove();
-    if(!err.message.match(/Function 404|Server |Invalid JSON|API error|No content/)){
+    // los errores que ya se han explicado en su propia burbuja no vuelven a
+    // hablar aqui: si no, el limite diario acaba con un "error de red" encima
+    // diciendo lo contrario.
+    if(!err.message.match(/Rate limited|Function 404|Server |Invalid JSON|API error|No content/)){
       if(streamBubble){
         streamBubble.querySelector('.ia-bubble').innerHTML = 'error de red. comprueba tu conexion e intentalo de nuevo.';
       } else {
@@ -7409,8 +7416,6 @@ function closeSidebars(){
   document.getElementById('sb-overlay').classList.remove('show');
 }
 
-// ═══════════════════════════════════════════
-// INIT
 // ═══════════════════════════════════════════
 // WORKLOAD CHART (next 8 weeks)
 // ═══════════════════════════════════════════

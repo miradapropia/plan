@@ -3,7 +3,7 @@
 > Organizador académico para estudiantes de arquitectura, con planificación por IA.
 
 [![Despliegue](https://img.shields.io/badge/deploy-netlify-00ad9f)](https://www.netlify.com/)
-[![Modelo IA](https://img.shields.io/badge/IA-Claude%20Sonnet%204-d97757)](https://anthropic.com/)
+[![Modelo IA](https://img.shields.io/badge/IA-Claude%20Sonnet%204.6%20%2B%20Haiku%204.5-d97757)](https://anthropic.com/)
 
 **Sitio en producción:** [plan.miradapropia.org](https://plan.miradapropia.org)
 
@@ -87,8 +87,11 @@ plan-miradapropia/
 ├── favicon.png                 ← Icono del navegador
 ├── og-image.png                ← Imagen para social sharing (1200×630)
 ├── README.md                   ← Este archivo
+├── CLAUDE.md                   ← Reglas de la casa para trabajar sobre el código
+├── herramientas/               ← Scripts que generaron la paleta (no se despliegan)
 ├── ambient/
-│   └── lofi-poster.png         ← poster del modo ambiente (el video vive en GitHub Releases)
+│   ├── lofi-v2.mp4             ← video de fondo del modo ambiente
+│   └── lofi-poster-v2.jpg      ← poster (mientras el video carga, o con reduced-motion)
 └── netlify/
     └── edge-functions/
         └── claude.js           ← Edge Function: proxy con streaming a la API (ruta /api/claude)
@@ -103,7 +106,7 @@ plan-miradapropia/
 - Twitter Card
 - JSON-LD `WebApplication` con datos estructurados
 - Canonical URL
-- robots.txt con reglas para crawlers (bloqueo opcional de bots de scraping de IA)
+- robots.txt con reglas para crawlers. Los bots de modelos de lenguaje (GPTBot, ClaudeBot, CCBot…) están **permitidos a propósito**: plan no tiene búsqueda propia detrás y la citación por asistentes de IA es su único canal orgánico
 - Sitemap.xml
 - Theme-color para PWA / móvil
 - Headers de seguridad: HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy
@@ -170,7 +173,7 @@ Reglas al añadir una comprobación nueva:
 
 Una comprobación en Haiku (`ejecutarCapa1()`) que se dispara sola 45 s después de la última edición, mira el **delta del bus** —no el plan entero— y como mucho suelta una frase, que aparece en la misma tira de avisos marcada como `asistente`.
 
-Coste medido: **~0,001 $ por chequeo** (~500 tokens de entrada, ~100 de salida). Un turno de conversación en Sonnet cuesta 30 veces más. Techo absoluto: 0,48 $ por estudiante y cuatrimestre; uso realista, ~0,05 $.
+Coste medido: **~0,0013 $ por chequeo** (~880 tokens de entrada, ~80 de salida). Un turno de conversación en Sonnet cuesta unas 30 veces más. Techo absoluto: ~0,62 $ por estudiante y cuatrimestre; uso realista, ~0,05 $.
 
 **No usa caché de prompt a propósito.** El prompt son ~350 tokens y Haiku exige 1.024 para cachear: inflarlo hasta el mínimo saldría más caro que no cachear.
 
@@ -311,7 +314,7 @@ La función serverless no se encuentra. Puede deberse a:
 ### Error de la API (rate limit, modelo no encontrado, etc)
 
 - **Rate limit**: espera unos segundos y reintenta
-- **Modelo no encontrado**: el identificador del modelo en `index.html` (`claude-sonnet-4-6`) puede haber cambiado. Consulta los modelos disponibles en [docs.claude.com](https://docs.claude.com/en/docs/about-claude/models/overview)
+- **Modelo no encontrado**: el identificador del modelo vive en la tabla `INTENTS` de `netlify/edge-functions/claude.js`, no en el cliente. Consulta los modelos disponibles en [docs.claude.com](https://docs.claude.com/en/docs/about-claude/models/overview)
 - **Insufficient credits**: añade saldo en [console.anthropic.com](https://console.anthropic.com)
 
 ### "A listener indicated an asynchronous response..."
