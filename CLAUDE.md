@@ -258,8 +258,11 @@ false: no se ejecuta javascript embebido en un PDF.
 
 Si añades un recurso externo, hay que añadirlo a la CSP; si no, falla en silencio
 en producción y funciona en local. El inventario actual: jsDelivr (pdf.js),
-Google Fonts, y los tres reproductores embebidos (Spotify, YouTube-nocookie,
-SoundCloud) filtrados por `EMBED_HOSTS_RE`.
+Google Fonts, los tres reproductores embebidos (Spotify, YouTube-nocookie,
+SoundCloud) filtrados por `EMBED_HOSTS_RE` y Google Analytics
+(`*.googletagmanager.com`, `*.google-analytics.com`, `*.analytics.google.com`),
+que solo carga con consentimiento desde `mp-analitica.js`, copia literal de la
+de guIA (16/10/2026).
 
 ### SEO y texto servido
 
