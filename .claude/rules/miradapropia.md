@@ -1,6 +1,6 @@
 # miradapropia · reglas de la casa
 
-versión: v2 · 2026-10-15. es copia de la skill director-miradapropia de claude.ai y la pone al día dirección en todos los repos a la vez: no la edites aquí. si una regla no encaja, déjalo como nota para dirección.
+versión: v3 · 2026-10-16. es copia de la skill director-miradapropia de claude.ai y la pone al día dirección en todos los repos a la vez: no la edites aquí. si una regla no encaja, déjalo como nota para dirección.
 
 este repo es una de las herramientas gratuitas de miradapropia.org, la plataforma en español de formación en arquitectura. miquel angel dirige y tú ejecutas.
 
@@ -28,8 +28,11 @@ este repo es una de las herramientas gratuitas de miradapropia.org, la plataform
 - la honestidad va antes que la comisión ("espera a octubre para comprar portátil", aunque cueste afiliación).
 
 ### 2.5 programas
-- en miradapropia solo se usan affinity y autocad (vídeos, cursos y tutoriales).
-- al recomendar, software gratuito o con licencia de estudiante antes que de pago.
+- se usa el software que mejor resuelva cada tarea (autocad, revit, archicad, rhino, sketchup, blender, motores de render, qgis…), con licencia gratuita o de estudiante antes que de pago.
+- photoshop, illustrator e indesign no se usan ni se enseñan: imagen, vectorial y maquetación se hacen con affinity, que es gratis. solo se nombran para decir que affinity los sustituye.
+- vale para vídeos, cursos, tutoriales y artículos. lo ya publicado no se rehace por esto.
+- el asistente de software los mantiene como referencia, por si la escuela los pide, y en cada uno remite a affinity.
+- marcas: adobe no entra; el software de render, bim o modelado, sí, si lo recomendaríamos sin cobrar (3.3).
 
 ### 2.6 diseño
 - inter; blanco y negro estricto, sin color de acento; líneas de 1px. firma: cursor de punto y marcas de esquina.
@@ -56,6 +59,16 @@ este repo es una de las herramientas gratuitas de miradapropia.org, la plataform
 - antes de subir a main, el build de la herramienta pasa.
 - el CLAUDE.md de cada repo es su manual técnico y manda en lo técnico; estas reglas, en lo de la casa.
 
+plan hasta el 31/03/2027 (encargos para claude code; en cada herramienta que se toque, instrumentación anónima, 2.7, y el pie común)
+- comparador-portatiles-accesorios, antes del 15/11: fuera los botones a claves de gvgmall (queda la vía gratuita de azure para estudiantes); corregir que autocad no existe para mac; aviso de afiliación visible arriba, no solo en el pie; aviso honesto de cuándo comprar (comparar precios en la semana de ofertas, sin prisa); enlaces /ir/{modelo} con el id de seguimiento del comparador y registro anónimo de clics por país y tienda, sin coste mensual nuevo. españa, a amazon con la etiqueta; latinoamérica, a la ficha del fabricante sin afiliación y a un descargable.
+- universidades, antes del 15/12: la columna «distancia», que sale vacía; los precios que no casan (1.166 € junto a 16.700 €), y el title y la meta para las búsquedas de notas de corte.
+- estructuras-elu, antes del 15/12: canonical y og:image a estructuras-elu.miradapropia.org, porque elu. no existe; enlace al taller, pie común y privacidad.
+- asistente-software, antes del 31/01/2027: fuera los «avísame» sin campo; los enlaces de «web oficial» y «licencia de estudiante» que van a «#»; en photoshop, illustrator e indesign, aviso de que miradapropia usa affinity, gratis (2.5).
+- plan, antes del 31/01/2027: quitar la contradicción entre «sin registro» e «iniciar sesión».
+- guIA, antes del 31/01/2027: decir qué se hace con lo que se escribe (2.7) y cuadrar las «cuatro funcionalidades» con las cinco que enumera.
+- punto-de-rocio-glaser, convertidor-escala y sistema-proporciones, antes del 31/03/2027: fuera los restos de html («/div>»), la tabla de escalas en el html servido y las tildes de las metas («sección áurea»).
+- descargas-miradapropia (netlify, sin despliegue): en noviembre se decide si aloja los descargables o se borra; borrarla pide el visto bueno de miquel angel.
+
 ## el ecosistema
 
 ### herramientas (repo → dirección)
@@ -71,6 +84,7 @@ este repo es una de las herramientas gratuitas de miradapropia.org, la plataform
 - programa-necesidades → superficies.miradapropia.org
 - sistema-proporciones → proporciones.miradapropia.org
 - alta en la newsletter: newsletter.miradapropia.org.
+- descargas-miradapropia.netlify.app: proyecto de netlify sin despliegue ni repo en esta lista; pendiente de decidir (3.4).
 - comparador-portatiles-2.0 está congelado: no se toca, porque en netlify despliega el último push y podría tapar el comparador vivo.
 - no existen, aunque salgan en documentos viejos: elu., guia. y herramientas.miradapropia.org.
 - cadena de autoridad: portada → páginas de wordpress → herramientas.
