@@ -185,7 +185,8 @@ input,textarea,select{color:inherit}
   --ia-w:340px;
   --ia-w-collapsed:42px;
   --paper-noise-opacity:.018;
-  --cursor-dot:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Ccircle cx='6' cy='6' r='4' fill='%231d1d1f'/%3E%3C/svg%3E") 6 6, auto;
+  /* cursor de punto: el de mp.css v1, igual en las once herramientas; de noche, el mismo punto en claro */
+  --cursor-dot:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%231d1d1f'/%3E%3C/svg%3E") 8 8, auto;
 }
 html.dark, [data-theme="dark"]{
   /* rampa espejada: mismo contraste relativo que en claro */
@@ -203,7 +204,7 @@ html.dark, [data-theme="dark"]{
   --cat-1:#c0a179; --cat-2:#7daad3; --cat-3:#b89dbb; --cat-4:#69b3a8; --cat-5:#cb9b8d;
   --cat-6:#d495a0; --cat-7:#7caeb7; --cat-8:#9aa5ca; --cat-9:#aaa785; --cat-10:#91ad94;
   --paper-noise-opacity:.025;
-  --cursor-dot:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Ccircle cx='6' cy='6' r='4' fill='%23f5f5f7'/%3E%3C/svg%3E") 6 6, auto;
+  --cursor-dot:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%23f5f5f7'/%3E%3C/svg%3E") 8 8, auto;
 }
 
 /* ── DARK MODE COMPREHENSIVE OVERRIDES ── */
@@ -1479,8 +1480,8 @@ body.ambient-on.spotlight-on .spotlight{display:flex}
 }
 
 /* ─── base mirada propia: cursor, foco, hundido, movimiento ─── */
-html, html *{cursor:var(--cursor-dot) !important}
-body.ambient-on, body.ambient-on *{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Ccircle cx='6' cy='6' r='4' fill='%23f5f5f7'/%3E%3C/svg%3E") 6 6, auto !important}
+html, html *, html *::before, html *::after{cursor:var(--cursor-dot) !important}
+body.ambient-on, body.ambient-on *, body.ambient-on *::before, body.ambient-on *::after{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%23f5f5f7'/%3E%3C/svg%3E") 8 8, auto !important}
 
 :focus-visible{outline:none;box-shadow:var(--focus-ring)}
 
