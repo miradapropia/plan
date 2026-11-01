@@ -40,6 +40,7 @@ robots.txt                     permite a propósito los bots de IA
 sitemap.xml                    una sola URL; actualiza lastmod en cambios grandes
 herramientas/                  scripts python que generaron la paleta (no se despliegan)
 ambient/                       video y poster del modo ambiente
+fonts/                         inter, copia literal de la de guIA, y su licencia
 ```
 
 ### Dentro de `index.html`
@@ -258,11 +259,12 @@ false: no se ejecuta javascript embebido en un PDF.
 
 Si añades un recurso externo, hay que añadirlo a la CSP; si no, falla en silencio
 en producción y funciona en local. El inventario actual: jsDelivr (pdf.js),
-Google Fonts, los tres reproductores embebidos (Spotify, YouTube-nocookie,
+los tres reproductores embebidos (Spotify, YouTube-nocookie,
 SoundCloud) filtrados por `EMBED_HOSTS_RE` y Google Analytics
 (`*.googletagmanager.com`, `*.google-analytics.com`, `*.analytics.google.com`),
 que solo carga con consentimiento desde `mp-analitica.js`, copia literal de la
-de guIA (16/10/2026).
+de guIA (16/10/2026). La letra, Inter, ya no viene de Google Fonts: se sirve
+desde `fonts/` (copia literal de la de guIA) y la CSP solo deja `font-src 'self'`.
 
 ### SEO y texto servido
 
