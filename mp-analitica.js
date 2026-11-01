@@ -1,8 +1,10 @@
 /* ═══════════════════════════════════════════════
-   mp-analitica.js · analítica del ecosistema miradapropia · v1
+   mp-analitica.js · analítica del ecosistema miradapropia · v2
    fuente de verdad: este archivo, en el repo guIA. en las demás
    herramientas es una copia literal: no editar allí; editar aquí
    y propagar la copia, igual que mp.css.
+   v1 · 16/10/2026: ga solo con consentimiento.
+   v2 · 01/11/2026: mpMedir y el evento clic_ecosistema.
 
    qué hace
    - google analytics 4 (G-0NSDDT1H5Z, la misma propiedad que la
@@ -19,6 +21,23 @@
      de google ni personalización de anuncios.
    - solo actúa en *.miradapropia.org: en local y en las previews
      de netlify no hace nada.
+
+   medición
+   - window.mpMedir(nombre, parametros, unaVez) manda un evento a ga
+     solo si la persona ha aceptado; si no, no hace nada ni guarda
+     nada para después. claves en minúsculas y valores de una lista
+     cerrada de la herramienta (60 caracteres como mucho): nunca
+     texto escrito por la persona. con unaVez, el mismo evento con
+     los mismos parámetros sale una sola vez por página cargada.
+     este archivo carga el último y fuera de *.miradapropia.org no
+     existe, así que las herramientas lo llaman siempre con guarda:
+       if (window.mpMedir) mpMedir('uso', { accion: 'nota' }, true);
+   - clic_ecosistema lo mide este archivo solo, en las once: un clic
+     en un enlace a otra parte de miradapropia.org (otra herramienta,
+     la web o la newsletter), con destino (el subdominio, o «web»)
+     y zona (pie, cabecera, aviso o cuerpo).
+   - en ga (administrar, definiciones personalizadas) se dan de alta
+     como dimensiones de evento accion, detalle, destino y zona.
 
    requisitos donde hay csp (netlify.toml)
    - script-src  https://*.googletagmanager.com
@@ -108,6 +127,47 @@
     if (cargado) window.gtag('consent', 'update', { analytics_storage: 'denied' });
     borrarCookiesGA();
   }
+
+  var enviados = {};
+
+  function medir(nombre, parametros, unaVez) {
+    if (!cargado || window['ga-disable-' + ID] || typeof window.gtag !== 'function') return;
+    if (!/^[a-z_]{1,40}$/.test(String(nombre))) return;
+    var limpio = {};
+    Object.keys(parametros || {}).forEach(function (clave) {
+      var valor = parametros[clave];
+      if (!/^[a-z_]{1,24}$/.test(clave)) return;
+      if (typeof valor === 'number' && isFinite(valor)) limpio[clave] = valor;
+      else if (typeof valor === 'string' && valor) limpio[clave] = valor.slice(0, 60);
+    });
+    if (unaVez) {
+      var huella = nombre + '|' + JSON.stringify(limpio);
+      if (enviados[huella]) return;
+      enviados[huella] = true;
+    }
+    window.gtag('event', nombre, limpio);
+  }
+  window.mpMedir = medir;
+
+  // a qué parte del ecosistema lleva un enlace: el subdominio, «web» o null si es esta misma o de fuera
+  function destinoDe(host) {
+    if (host === location.hostname || !/(^|\.)miradapropia\.org$/.test(host)) return null;
+    if (host === 'miradapropia.org' || host === 'www.miradapropia.org') return 'web';
+    return host.replace(/\.miradapropia\.org$/, '');
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!cargado) return;
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a || a.hasAttribute('data-mp-cookies')) return;
+    var destino;
+    try { destino = destinoDe(new URL(a.href, location.href).hostname.toLowerCase()); } catch (er) { return; }
+    if (!destino) return;
+    var zona = a.closest('.mp-ck') ? 'aviso'
+      : a.closest('.mp-foot, footer') ? 'pie'
+      : a.closest('header, nav, .mp-head') ? 'cabecera' : 'cuerpo';
+    medir('clic_ecosistema', { destino: destino, zona: zona });
+  });
 
   var CSS =
     '.mp-ck{position:fixed;left:16px;right:16px;bottom:16px;z-index:2147483000;' +

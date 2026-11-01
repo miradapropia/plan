@@ -2608,6 +2608,15 @@ function pushChange(change){
     src: change.src === 'ia' ? 'ia' : 'user'
   });
   if(STATE.changeBus.length > CHANGE_BUS_LIMIT) STATE.changeBus.length = CHANGE_BUS_LIMIT;
+  // analítica (mp-analitica.js, solo con consentimiento): qué parte del plan se
+  // usa (asignatura, entrega…) y cómo (crear, hecho…, a mano o con la ia), una
+  // vez por página cargada. nunca el id ni el texto del cambio
+  if(window.mpMedir){
+    const QUE = {subject:'asignatura', event:'entrega', schedule:'horario', note:'nota', session:'sesion', target:'objetivo', plan:'plan'};
+    const COMO = {add:'crear', update:'cambiar', delete:'borrar', done:'hecho', log:'registro'};
+    const c = STATE.changeBus[0];
+    if(QUE[c.entity]) mpMedir('uso', {accion: QUE[c.entity], detalle: (COMO[c.op] || 'cambiar') + (c.src === 'ia' ? '_ia' : '')}, true);
+  }
 }
 
 // cambios posteriores a un instante dado, mas recientes primero
@@ -6876,6 +6885,10 @@ async function sendMsg(){
     txt;
 
   pendingFiles = []; renderChips();
+
+  // analítica (mp-analitica.js, solo con consentimiento): que se ha hablado con
+  // la ia, con archivo o sin él, una vez por página. nunca el mensaje ni el archivo
+  if(window.mpMedir) mpMedir('uso', {accion:'ia', detalle: hasFiles ? 'con_archivo' : 'texto'}, true);
 
   // Store the message in the in-memory conversation. PDF content is now plain text
   // (lightweight), so it persists fine and the IA keeps full context all session.
