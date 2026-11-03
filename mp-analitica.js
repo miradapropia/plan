@@ -9,7 +9,8 @@
         página (o a 8 s sin desplazarse) y en el móvil es compacto,
         para no tapar lo primero que se usa (el primer «ver precio»
         del comparador, el campo de pregunta de guIA). el enlace
-        «cookies» del pie lo sigue abriendo al momento.
+        «cookies» del pie lo sigue abriendo al momento. texto más
+        corto, para caber en dos líneas en el móvil.
 
    qué hace
    - google analytics 4 (G-0NSDDT1H5Z, la misma propiedad que la
@@ -29,9 +30,11 @@
    - el aviso no sale al cargar: espera a que la persona desplace la
      página (rueda, dedo, teclado o barra; no cuenta el desplazamiento
      que haga la propia herramienta) o a 8 s sin desplazarse. en el
-     móvil (480 px o menos) es compacto: el mismo texto en letra de
-     11 px (tres líneas a 390 px) y los dos botones, del mismo tamaño,
-     en una fila debajo.
+     móvil (480 px o menos) es compacto: el texto en dos líneas (11 px,
+     también a 320 px) y los dos botones, del mismo tamaño, en una fila
+     debajo. el texto se acortó para caber en dos líneas sin bajar de
+     11 px y dice lo mismo: ga solo si aceptas, no ve lo que escribes,
+     no se usa para anuncios y el enlace a la política de cookies.
    - sale abajo en el centro, salvo que ahí tape más controles que
      en otro sitio (los campos de texto y los botones rellenos pesan
      más): entonces va abajo a un lado, en pantallas anchas, o arriba,
@@ -232,8 +235,7 @@
 
     var texto = document.createElement('p');
     texto.appendChild(document.createTextNode(
-      'medimos el uso de las herramientas con google analytics, solo si aceptas. ' +
-      'no recibe nada de lo que escribes y no se usa para anuncios. '));
+      'usamos google analytics solo si aceptas. no ve lo que escribes ni se usa para anuncios. '));
     var enlace = document.createElement('a');
     enlace.href = POLITICA;
     enlace.target = '_blank';
