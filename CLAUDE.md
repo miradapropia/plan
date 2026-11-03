@@ -266,7 +266,7 @@ que solo carga con consentimiento desde `mp-analitica.js`, copia literal de la
 de guIA (16/10/2026). La letra, Inter, ya no viene de Google Fonts: se sirve
 desde `fonts/` (copia literal de la de guIA) y la CSP solo deja `font-src 'self'`.
 
-Con GA aceptado se manda el evento `uso` (`window.mpMedir`, mp-analitica.js v2),
+Con GA aceptado se manda el evento `uso` (`window.mpMedir`, de mp-analitica.js desde la v2),
 una vez por página y sin ids ni textos: `pushChange` lo manda con la entidad en
 español en `accion` (`asignatura`, `entrega`, `horario`, `nota`, `sesion`,
 `objetivo`, `plan`) y la operación en `detalle` (`crear`, `cambiar`, `borrar`,

@@ -1,10 +1,15 @@
 /* ═══════════════════════════════════════════════
-   mp-analitica.js · analítica del ecosistema miradapropia · v2
+   mp-analitica.js · analítica del ecosistema miradapropia · v3
    fuente de verdad: este archivo, en el repo guIA. en las demás
    herramientas es una copia literal: no editar allí; editar aquí
    y propagar la copia, igual que mp.css.
    v1 · 16/10/2026: ga solo con consentimiento.
    v2 · 01/11/2026: mpMedir y el evento clic_ecosistema.
+   v3 · 03/11/2026: el aviso espera al primer desplazamiento de la
+        página (o a 8 s sin desplazarse) y en el móvil es compacto,
+        para no tapar lo primero que se usa (el primer «ver precio»
+        del comparador, el campo de pregunta de guIA). el enlace
+        «cookies» del pie lo sigue abriendo al momento.
 
    qué hace
    - google analytics 4 (G-0NSDDT1H5Z, la misma propiedad que la
@@ -21,6 +26,16 @@
      de google ni personalización de anuncios.
    - solo actúa en *.miradapropia.org: en local y en las previews
      de netlify no hace nada.
+   - el aviso no sale al cargar: espera a que la persona desplace la
+     página (rueda, dedo, teclado o barra; no cuenta el desplazamiento
+     que haga la propia herramienta) o a 8 s sin desplazarse. en el
+     móvil (480 px o menos) es compacto: el mismo texto en letra de
+     11 px (tres líneas a 390 px) y los dos botones, del mismo tamaño,
+     en una fila debajo.
+   - sale abajo en el centro, salvo que ahí tape más controles que
+     en otro sitio (los campos de texto y los botones rellenos pesan
+     más): entonces va abajo a un lado, en pantallas anchas, o arriba,
+     debajo de la cabecera fija de la herramienta.
 
    medición
    - window.mpMedir(nombre, parametros, unaVez) manda un evento a ga
@@ -194,9 +209,15 @@
     '.mp-ck button:active{transform:scale(.97)}' +
     '.mp-ck button:focus-visible,.mp-ck a:focus-visible{outline:none;' +
       'box-shadow:var(--focus-ring,0 0 0 2px #fbfbfd,0 0 0 4px #1d1d1f)}' +
-    /* en el móvil, lo más bajo posible: no debe tapar el primer botón de compra del comparador */
-    '@media (max-width:480px){.mp-ck{left:12px;right:12px;bottom:12px;padding:12px 14px;gap:10px;' +
-      'font-size:12px;line-height:1.45}.mp-ck-b{width:100%}.mp-ck button{flex:1;padding:8px 14px}}' +
+    /* arriba, debajo de la cabecera fija de la herramienta, cuando abajo taparía más */
+    '.mp-ck.mp-ck-arriba{bottom:auto;transform:translateY(-8px)}' +
+    '.mp-ck.mp-ck-arriba.mp-ck-on{transform:none}' +
+    '.mp-ck.mp-ck-lado{margin:0}' +
+    /* en el móvil, compacto: el texto en poco alto y los dos botones en una fila */
+    '@media (max-width:480px){.mp-ck{left:8px;right:8px;bottom:8px;padding:10px 12px;gap:8px;' +
+      'font-size:11px;line-height:1.4;letter-spacing:-.005em;border-radius:var(--radius-md,12px)}' +
+      '.mp-ck p{flex-basis:100%}.mp-ck-b{width:100%}' +
+      '.mp-ck button{flex:1;font-size:12px;padding:7px 12px}}' +
     '@media (prefers-reduced-motion:reduce){.mp-ck,.mp-ck button{transition:none}}';
 
   function crearAviso() {
@@ -240,10 +261,96 @@
     return caja;
   }
 
+  // controles que el aviso no debería tapar: los campos de texto pesan más que el resto
+  var CONTROLES = 'a[href],button,input,textarea,select,[role="button"],[contenteditable="true"]';
+
+  function solape(r, x0, x1, y0, y1) {
+    var alto = Math.min(r.bottom, y1) - Math.max(r.top, y0);
+    var ancho = Math.min(r.right, x1) - Math.max(r.left, x0);
+    return alto > 0 && ancho > 0 ? alto * ancho : 0;
+  }
+
+  // dónde acaba la cabecera fija o pegada de la herramienta, si la hay
+  function bajoCabecera() {
+    var fondo = 0;
+    var x = window.innerWidth / 2;
+    var pila = document.elementsFromPoint ? document.elementsFromPoint(x, 2) : [];
+    pila.forEach(function (el) {
+      for (var n = el; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+        var pos = getComputedStyle(n).position;
+        if (pos === 'fixed' || pos === 'sticky') {
+          var r = n.getBoundingClientRect();
+          if (r.top <= 2 && r.bottom < window.innerHeight * 0.4) fondo = Math.max(fondo, r.bottom);
+        }
+      }
+    });
+    return fondo;
+  }
+
+  // cuánto pesa tapar un control: los campos de texto y los botones rellenos (los
+  // principales, como «ver precio») mucho más que un enlace o un chip
+  function pesoDe(el) {
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) return 6;
+    var m = getComputedStyle(el).backgroundColor.match(/[\d.]+/g);
+    if (m && (m.length < 4 || +m[3] > 0.5) && (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) < 128) return 6;
+    return 1;
+  }
+
+  // dónde va: abajo en el centro salvo que otro sitio tape menos controles (por
+  // superficie y peso): abajo a la derecha o a la izquierda en pantallas anchas, o
+  // arriba, debajo de la cabecera fija de la herramienta
+  var SITIOS = ['centro', 'der', 'izq', 'arriba'];
+
+  function colocar() {
+    var caja = aviso.getBoundingClientRect();
+    var ancho = caja.width;
+    var alto = caja.height;
+    var margen = parseFloat(getComputedStyle(aviso).bottom) || 16;
+    var vw = document.documentElement.clientWidth;
+    var vh = window.innerHeight;
+    var techo = bajoCabecera() + margen;
+    var abajo = [vh - margen - alto, vh - margen];
+    var zonas = {
+      centro: [caja.left, caja.right, abajo[0], abajo[1]],
+      der: [vw - margen - ancho, vw - margen, abajo[0], abajo[1]],
+      izq: [margen, margen + ancho, abajo[0], abajo[1]],
+      arriba: [caja.left, caja.right, techo, techo + alto]
+    };
+    var lado = vw - 2 * margen - ancho > 40;
+    var peso = { centro: 0, der: 0, izq: 0, arriba: 0 };
+    var lista = document.querySelectorAll(CONTROLES);
+    for (var i = 0; i < lista.length; i++) {
+      var el = lista[i];
+      if (aviso.contains(el) || el.type === 'hidden') continue;
+      var r = el.getBoundingClientRect();
+      if (!r.width || !r.height || r.bottom < 0 || r.top > vh) continue;
+      var k = 0;
+      SITIOS.forEach(function (s) {
+        var z = zonas[s];
+        var a = solape(r, z[0], z[1], z[2], z[3]);
+        if (a) peso[s] += (k || (k = pesoDe(el))) * a;
+      });
+    }
+    var sitio = 'centro';
+    SITIOS.forEach(function (s) {
+      if ((s === 'der' || s === 'izq') && !lado) return;
+      if (peso[s] < peso[sitio]) sitio = s;
+    });
+    aviso.classList.toggle('mp-ck-arriba', sitio === 'arriba');
+    aviso.classList.toggle('mp-ck-lado', sitio === 'der' || sitio === 'izq');
+    aviso.style.top = sitio === 'arriba' ? techo + 'px' : '';
+    aviso.style.width = sitio === 'der' || sitio === 'izq' ? ancho + 'px' : '';
+    aviso.style.left = sitio === 'der' ? 'auto' : sitio === 'izq' ? margen + 'px' : '';
+    aviso.style.right = sitio === 'izq' ? 'auto' : sitio === 'der' ? margen + 'px' : '';
+  }
+
   function mostrar(conFoco) {
     if (!document.body) return;
     if (!aviso) aviso = crearAviso();
     aviso.hidden = false;
+    aviso.classList.remove('mp-ck-arriba', 'mp-ck-lado');
+    aviso.style.top = aviso.style.width = aviso.style.left = aviso.style.right = '';
+    colocar();
     requestAnimationFrame(function () { aviso.classList.add('mp-ck-on'); });
     if (conFoco) aviso.querySelector('button').focus();
   }
@@ -258,18 +365,60 @@
     var t = e.target && e.target.closest ? e.target.closest('[data-mp-cookies]') : null;
     if (!t) return;
     e.preventDefault();
+    quitarEspera();
     mostrar(true);
   });
+
+  // el aviso espera a la primera señal de lectura: un desplazamiento hecho por la
+  // persona (rueda, dedo, teclas de desplazamiento o la barra) o 8 s sin desplazarse.
+  // el desplazamiento que hace la herramienta sola (bajar un chat, un ancla) no cuenta.
+  var ESPERA = 8000;
+  var TECLAS = /^(ArrowDown|ArrowUp|PageDown|PageUp|End|Home| |Spacebar)$/;
+  var espera = null;
+  var pulsado = false;
+
+  function quitarEspera() {
+    if (espera === null) return;
+    clearTimeout(espera);
+    espera = null;
+    window.removeEventListener('wheel', alLeer, true);
+    window.removeEventListener('touchmove', alLeer, true);
+    window.removeEventListener('keydown', alTeclear, true);
+    window.removeEventListener('pointerdown', alPulsar, true);
+    window.removeEventListener('pointerup', alSoltar, true);
+    window.removeEventListener('scroll', alDesplazar, true);
+  }
+  function salir() {
+    if (espera === null) return;
+    quitarEspera();
+    if (leer() === null) mostrar(false);
+  }
+  function alLeer() { salir(); }
+  function alTeclear(e) {
+    var t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if (TECLAS.test(e.key)) salir();
+  }
+  function alPulsar() { pulsado = true; }
+  function alSoltar() { pulsado = false; }
+  function alDesplazar() { if (pulsado) salir(); }
+
+  function esperar() {
+    var o = { capture: true, passive: true };
+    espera = setTimeout(salir, ESPERA);
+    window.addEventListener('wheel', alLeer, o);
+    window.addEventListener('touchmove', alLeer, o);
+    window.addEventListener('keydown', alTeclear, true);
+    window.addEventListener('pointerdown', alPulsar, true);
+    window.addEventListener('pointerup', alSoltar, true);
+    window.addEventListener('scroll', alDesplazar, o);
+  }
 
   var gpc = navigator.globalPrivacyControl === true;
   var eleccion = leer();
   if (eleccion === 'si' && !gpc) {
     cargar();
   } else if (eleccion === null && !gpc) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function () { mostrar(false); });
-    } else {
-      mostrar(false);
-    }
+    esperar();
   }
 })();
