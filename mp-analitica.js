@@ -35,10 +35,10 @@
      debajo. el texto se acortó para caber en dos líneas sin bajar de
      11 px y dice lo mismo: ga solo si aceptas, no ve lo que escribes,
      no se usa para anuncios y el enlace a la política de cookies.
-   - sale abajo en el centro, salvo que ahí tape más controles que
-     en otro sitio (los campos de texto y los botones rellenos pesan
-     más): entonces va abajo a un lado, en pantallas anchas, o arriba,
-     debajo de la cabecera fija de la herramienta.
+   - sale siempre abajo (decisión de miquel angel, 03/11/2026): en el
+     centro, salvo que en pantallas anchas tape menos controles a un
+     lado (los campos de texto y los botones rellenos pesan más). en el
+     móvil va abajo a todo el ancho, lo más bajo y estrecho posible.
 
    medición
    - window.mpMedir(nombre, parametros, unaVez) manda un evento a ga
@@ -212,15 +212,12 @@
     '.mp-ck button:active{transform:scale(.97)}' +
     '.mp-ck button:focus-visible,.mp-ck a:focus-visible{outline:none;' +
       'box-shadow:var(--focus-ring,0 0 0 2px #fbfbfd,0 0 0 4px #1d1d1f)}' +
-    /* arriba, debajo de la cabecera fija de la herramienta, cuando abajo taparía más */
-    '.mp-ck.mp-ck-arriba{bottom:auto;transform:translateY(-8px)}' +
-    '.mp-ck.mp-ck-arriba.mp-ck-on{transform:none}' +
     '.mp-ck.mp-ck-lado{margin:0}' +
     /* en el móvil, compacto: el texto en poco alto y los dos botones en una fila */
-    '@media (max-width:480px){.mp-ck{left:8px;right:8px;bottom:8px;padding:10px 12px;gap:8px;' +
-      'font-size:11px;line-height:1.4;letter-spacing:-.005em;border-radius:var(--radius-md,12px)}' +
-      '.mp-ck p{flex-basis:100%}.mp-ck-b{width:100%}' +
-      '.mp-ck button{flex:1;font-size:12px;padding:7px 12px}}' +
+    '@media (max-width:480px){.mp-ck{left:6px;right:6px;bottom:6px;padding:8px 10px;gap:6px;' +
+      'font-size:11px;line-height:1.35;letter-spacing:-.005em;border-radius:var(--radius-md,12px)}' +
+      '.mp-ck p{flex-basis:100%}.mp-ck-b{width:100%;gap:6px}' +
+      '.mp-ck button{flex:1;font-size:12px;padding:6px 12px}}' +
     '@media (prefers-reduced-motion:reduce){.mp-ck,.mp-ck button{transition:none}}';
 
   function crearAviso() {
@@ -272,23 +269,6 @@
     return alto > 0 && ancho > 0 ? alto * ancho : 0;
   }
 
-  // dónde acaba la cabecera fija o pegada de la herramienta, si la hay
-  function bajoCabecera() {
-    var fondo = 0;
-    var x = window.innerWidth / 2;
-    var pila = document.elementsFromPoint ? document.elementsFromPoint(x, 2) : [];
-    pila.forEach(function (el) {
-      for (var n = el; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
-        var pos = getComputedStyle(n).position;
-        if (pos === 'fixed' || pos === 'sticky') {
-          var r = n.getBoundingClientRect();
-          if (r.top <= 2 && r.bottom < window.innerHeight * 0.4) fondo = Math.max(fondo, r.bottom);
-        }
-      }
-    });
-    return fondo;
-  }
-
   // cuánto pesa tapar un control: los campos de texto y los botones rellenos (los
   // principales, como «ver precio») mucho más que un enlace o un chip
   function pesoDe(el) {
@@ -298,10 +278,9 @@
     return 1;
   }
 
-  // dónde va: abajo en el centro salvo que otro sitio tape menos controles (por
-  // superficie y peso): abajo a la derecha o a la izquierda en pantallas anchas, o
-  // arriba, debajo de la cabecera fija de la herramienta
-  var SITIOS = ['centro', 'der', 'izq', 'arriba'];
+  // dónde va: siempre abajo; en el centro, salvo que en pantallas anchas tape menos
+  // controles (por superficie y peso) abajo a la derecha o a la izquierda
+  var SITIOS = ['centro', 'der', 'izq'];
 
   function colocar() {
     var caja = aviso.getBoundingClientRect();
@@ -310,16 +289,14 @@
     var margen = parseFloat(getComputedStyle(aviso).bottom) || 16;
     var vw = document.documentElement.clientWidth;
     var vh = window.innerHeight;
-    var techo = bajoCabecera() + margen;
     var abajo = [vh - margen - alto, vh - margen];
     var zonas = {
       centro: [caja.left, caja.right, abajo[0], abajo[1]],
       der: [vw - margen - ancho, vw - margen, abajo[0], abajo[1]],
-      izq: [margen, margen + ancho, abajo[0], abajo[1]],
-      arriba: [caja.left, caja.right, techo, techo + alto]
+      izq: [margen, margen + ancho, abajo[0], abajo[1]]
     };
     var lado = vw - 2 * margen - ancho > 40;
-    var peso = { centro: 0, der: 0, izq: 0, arriba: 0 };
+    var peso = { centro: 0, der: 0, izq: 0 };
     var lista = document.querySelectorAll(CONTROLES);
     for (var i = 0; i < lista.length; i++) {
       var el = lista[i];
@@ -335,12 +312,10 @@
     }
     var sitio = 'centro';
     SITIOS.forEach(function (s) {
-      if ((s === 'der' || s === 'izq') && !lado) return;
+      if (s !== 'centro' && !lado) return;
       if (peso[s] < peso[sitio]) sitio = s;
     });
-    aviso.classList.toggle('mp-ck-arriba', sitio === 'arriba');
-    aviso.classList.toggle('mp-ck-lado', sitio === 'der' || sitio === 'izq');
-    aviso.style.top = sitio === 'arriba' ? techo + 'px' : '';
+    aviso.classList.toggle('mp-ck-lado', sitio !== 'centro');
     aviso.style.width = sitio === 'der' || sitio === 'izq' ? ancho + 'px' : '';
     aviso.style.left = sitio === 'der' ? 'auto' : sitio === 'izq' ? margen + 'px' : '';
     aviso.style.right = sitio === 'izq' ? 'auto' : sitio === 'der' ? margen + 'px' : '';
@@ -350,8 +325,8 @@
     if (!document.body) return;
     if (!aviso) aviso = crearAviso();
     aviso.hidden = false;
-    aviso.classList.remove('mp-ck-arriba', 'mp-ck-lado');
-    aviso.style.top = aviso.style.width = aviso.style.left = aviso.style.right = '';
+    aviso.classList.remove('mp-ck-lado');
+    aviso.style.width = aviso.style.left = aviso.style.right = '';
     colocar();
     requestAnimationFrame(function () { aviso.classList.add('mp-ck-on'); });
     if (conFoco) aviso.querySelector('button').focus();
